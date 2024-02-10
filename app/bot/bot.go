@@ -16,7 +16,7 @@ type Opts struct {
 		Token string `long:"token" env:"TOKEN" required:"true" description:"telegram bot token"`
 	} `group:"telegram" namespace:"telegram" env-namespace:"TELEGRAM"`
 
-	Url string `long:"url" env:"URL" required:"true" description:"bot url"`
+	URL string `long:"url" env:"URL" required:"true" description:"bot url"`
 	Debug bool `long:"debug" env:"DEBUG" description:"debug mode"`
 }
 
@@ -30,7 +30,7 @@ func (opts *Opts) Execute() error {
 
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
 		// If an error is returned by a handler, log it and continue going.
-		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
+		Error: func(_ *gotgbot.Bot, _ *ext.Context, err error) ext.DispatcherAction {
 			log.Println("an error occurred while handling update:", err.Error())
 			return ext.DispatcherActionNoop
 		},

@@ -1,1 +1,3 @@
-/dev/dev-env-setup.sh
+.env
+/tmp/
+/.env.test
