@@ -7,3 +7,10 @@ The application which only works with supplied token and file name. The registra
 *** [X] Parse the resutl with either ledger-cli or go ledger implementation
 *** [ ] Bind that all to work as a bot balance command.
 *** [ ] Deploy, and use
+** TODO Use slog for logs
+** TODO Embed commands in menu
+** TODO Add ability to add transactions through inline keyboard
+** TODO Add ability to add comments
+* Inbox
+** TODO Clone the repository into in-memory storage and feed the ledger from stdin, resolving includes on the fly.
+** TODO Separate test and run .env files.

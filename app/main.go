@@ -17,12 +17,13 @@ func main() {
 	opts := bot.Opts{}
 	_, err := flags.Parse(&opts)
 	if err != nil {
-		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
-			log.Printf("[ERROR] %v", err)
-		}
+		// if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
+		// 	log.Printf("[ERROR] %v", err)
+		// }
+		log.Printf("[ERROR] %v", err)
 		os.Exit(1)
 	}
-	log.Printf("[DEBUG] opts: %+v", opts)
+	// log.Printf("[DEBUG] opts: %+v", opts)
 
 	err = opts.Execute()
 	if err != nil {

@@ -30,5 +30,5 @@ jobs:
     - name: Test
       run: go test -v ./...
       env:
-        GIT_URL: ${{ secrets.GIT_URL }}
-        GIT_ACCESS_TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
+        GITHUB_URL: ${{ secrets.GIT_URL }}
+        GITHUB_TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}

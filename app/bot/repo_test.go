@@ -14,13 +14,13 @@ func TestCloneRepo(t *testing.T) {
 	godotenv.Load("../../.env")
 	tmpDir := t.TempDir()
 
-	gitURL := os.Getenv("GIT_URL")
+	gitURL := os.Getenv("GITHUB_URL")
 	if gitURL == "" {
 		t.Errorf("GIT_URL is not set")
 		return
 	}
 
-	gitAccessToken := os.Getenv("GIT_ACCESS_TOKEN")
+	gitAccessToken := os.Getenv("GITHUB_TOKEN")
 	if gitAccessToken == "" {
 		t.Errorf("GIT_ACCESS_TOKEN is not set")
 		return
@@ -44,21 +44,21 @@ func TestExecLedgerCmd(t *testing.T) {
 	godotenv.Load("../../.env.test")
 	tmpDir :=  t.TempDir()
 
-	gitURL := os.Getenv("GIT_URL")
+	gitURL := os.Getenv("GITHUB_URL")
 	if gitURL == "" {
 		t.Errorf("GIT_URL is not set")
 		return
 	}
 
-	gitAccessToken := os.Getenv("GIT_ACCESS_TOKEN")
-	if gitAccessToken == "" {
+	gitToken := os.Getenv("GITHUB_TOKEN")
+	if gitToken == "" {
 		t.Errorf("GIT_ACCESS_TOKEN is not set")
 		return
 	}
 
 	t.Run("happy path", func(t *testing.T) {
 
-		res, err := ExecLedgerCmd(gitURL, gitAccessToken, tmpDir, "main.ledger", "bal")
+		res, err := ExecLedgerCmd(gitURL, gitToken, tmpDir, "main.ledger", "bal")
 		if err != nil {
 			t.Errorf("Command execution error: %v", err)
 			return
@@ -91,7 +91,7 @@ func TestExecLedgerCmd(t *testing.T) {
 	})
 
 	t.Run("wrong file", func(t *testing.T) {
-		_, err := ExecLedgerCmd(gitURL, gitAccessToken, tmpDir, "not-exists.ledger", "bal")
+		_, err := ExecLedgerCmd(gitURL, gitToken, tmpDir, "not-exists.ledger", "bal")
 
 		if err == nil {
 			t.Errorf("Error excpected")
@@ -106,7 +106,7 @@ func TestExecLedgerCmd(t *testing.T) {
 
 
 	t.Run("wrong command", func(t *testing.T) {
-		_, err := ExecLedgerCmd(gitURL, gitAccessToken, tmpDir, "main.ledger", "unknown-command")
+		_, err := ExecLedgerCmd(gitURL, gitToken, tmpDir, "main.ledger", "unknown-command")
 
 		if err == nil {
 			t.Errorf("Error excpected")
