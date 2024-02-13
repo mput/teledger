@@ -15,6 +15,7 @@ var version = "dev"
 func main() {
 	fmt.Printf("teledger v:%s\n", version)
 	opts := bot.Opts{}
+	opts.Version = version
 	_, err := flags.Parse(&opts)
 	if err != nil {
 		// if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {

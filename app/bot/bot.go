@@ -25,6 +25,7 @@ type Opts struct {
 
 	URL string `long:"url" env:"URL" required:"true" description:"bot url"`
 	Debug bool `long:"debug" env:"DEBUG" description:"debug mode"`
+	Version string
 }
 
 
@@ -49,6 +50,7 @@ func (opts *Opts) Execute() error {
 
 	dispatcher.AddHandler(handlers.NewCommand("start", start))
 	dispatcher.AddHandler(handlers.NewCommand("bal", opts.bal))
+	dispatcher.AddHandler(handlers.NewCommand("version", opts.vesrion))
 	dispatcher.AddHandler(handlers.NewMessage(nil, message))
 
 	// Start receiving updates.
@@ -80,6 +82,14 @@ func start(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
+func (opts *Opts) vesrion(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	log.Printf("[INFO] version request. user=%s\n", msg.From.Username)
+	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("teledger v:%s", opts.Version), nil); err != nil {
+		return fmt.Errorf("unable to send message: %w", err)
+	}
+	return nil
+}
 
 func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
