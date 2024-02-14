@@ -67,7 +67,6 @@ func (opts *Opts) Execute() error {
 		return fmt.Errorf("failed to start polling: %v",  err)
 	}
 	log.Printf("[INFO] %s has been started...\n", b.User.Username)
-	// Idle, to keep updates coming in, and avoid bot stopping.
 	updater.Idle()
 
 	return nil
@@ -85,7 +84,7 @@ func start(b *gotgbot.Bot, ctx *ext.Context) error {
 func (opts *Opts) vesrion(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	log.Printf("[INFO] version request. user=%s\n", msg.From.Username)
-	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("teledger v:%s", opts.Version), nil); err != nil {
+	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("teledger v: %s", opts.Version), nil); err != nil {
 		return fmt.Errorf("unable to send message: %w", err)
 	}
 	return nil
