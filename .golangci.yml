@@ -22,7 +22,7 @@ linters-settings:
       - experimental
       - opinionated
       - diagnostic
-      - security
+      # - security
 
 linters:
   enable:

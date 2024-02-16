@@ -3,12 +3,13 @@ package bot
 import (
 	"fmt"
 	"log"
-	"os"
+	"log/slog"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/mput/teledger/app/repo"
 )
 
 
@@ -66,7 +67,7 @@ func (opts *Opts) Execute() error {
 	if err != nil {
 		return fmt.Errorf("failed to start polling: %v",  err)
 	}
-	log.Printf("[INFO] %s has been started...\n", b.User.Username)
+	log.Printf("[INFO] %s has been started...\n", b.Username)
 	updater.Idle()
 
 	return nil
@@ -94,20 +95,23 @@ func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	log.Printf("[INFO] balance request. user=%s\n", msg.From.Username)
 
-	dir, err := os.MkdirTemp("", msg.From.Username)
+	repo, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
+
 	if err != nil {
-		log.Printf("[ERROR] unable to create temp file: %v\n", err)
-		return fmt.Errorf("unable to create temp file: %w", err)
+		slog.Error("unable to init repo", "error", err)
+		b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to init repo: %v", err), nil)
+		return fmt.Errorf("unable to init repo: %w", err)
 	}
-	log.Printf("[DEBUG] temp dir: %s\n", dir)
 
-	defer os.RemoveAll(dir)
 
-	balance, err := ExecLedgerCmd(opts.Github.URL, opts.Github.Token, dir, opts.Github.MainLedgerFile, "bal")
+	ledger := NewLedger(repo, opts.Github.MainLedgerFile, true)
+
+	balance, err := ledger.Execute("bal")
+
 	if err != nil {
-		log.Printf("[ERROR] unable to get balance: %v\n", err)
+		slog.Error("unable to get balance", "error", err)
 		b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to get balance: %v", err), nil)
-		return nil
+		return fmt.Errorf("unable to get balance: %w", err)
 	}
 
 	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}); err != nil {
