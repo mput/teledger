@@ -19,7 +19,7 @@ func TestLedger_Execute(t *testing.T) {
 `
 
 		ledger := NewLedger(
-			&repo.RepoMock{Files: map[string]string{"main.ledger": testFile}},
+			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
 			"main.ledger",
 			false,
 		)
@@ -64,7 +64,7 @@ commodity EUR
 `,
 
 		}
-		repomock := &repo.RepoMock{
+		repomock := &repo.Mock{
 			Files: files,
 		}
 

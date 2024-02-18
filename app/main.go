@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/jessevdk/go-flags"
@@ -12,22 +12,35 @@ import (
 
 var version = "dev"
 
+func setupLogger(debug bool) {
+	opts := &slog.HandlerOptions{
+        Level: slog.LevelInfo,
+    }
+
+	if debug {
+		opts.Level = slog.LevelDebug
+		opts.AddSource = true
+	}
+
+	textHandler := slog.NewTextHandler(os.Stdout, opts)
+	logger := slog.New(textHandler)
+
+	slog.SetDefault(logger)
+}
+
 func main() {
 	fmt.Printf("teledger v:%s\n", version)
 	opts := bot.Opts{}
 	opts.Version = version
 	_, err := flags.Parse(&opts)
 	if err != nil {
-		// if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
-		// 	log.Printf("[ERROR] %v", err)
-		// }
-		log.Printf("[ERROR] %v", err)
+		fmt.Printf("[ERROR] %v", err)
 		os.Exit(1)
 	}
-	// log.Printf("[DEBUG] opts: %+v", opts)
+	setupLogger(opts.Debug)
 
 	err = opts.Execute()
 	if err != nil {
-		log.Fatalf("[ERROR] unable to start bot: %v", err)
+		slog.Error("unable to start bot: %v", err)
 	}
 }

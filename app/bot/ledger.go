@@ -14,12 +14,12 @@ import (
 
 
 type Ledger struct {
-	repo repo.RepoService
+	repo repo.Service
 	mainFile string
 	strict bool
 }
 
-func NewLedger(rs repo.RepoService, mainFile string, strict bool) *Ledger {
+func NewLedger(rs repo.Service, mainFile string, strict bool) *Ledger {
 	return &Ledger{
 		repo: rs,
 		mainFile: mainFile,
@@ -29,7 +29,7 @@ func NewLedger(rs repo.RepoService, mainFile string, strict bool) *Ledger {
 
 const ledgerBinary = "ledger"
 
-func resolveIncludesReader(rs repo.RepoService, file string) (io.ReadCloser, error) {
+func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) {
 	ledgerFile, err := rs.OpenReader(file)
 	if err != nil {
 		return nil, err
@@ -124,5 +124,9 @@ func (l *Ledger) Execute(args ...string) (result string,err error) {
 		return "", fmt.Errorf("ledger command executing error: %v", err)
 	}
 
+	res := out.String()
+	if res == "" {
+		return "", fmt.Errorf("ledger command returned empty result")
+	}
 	return out.String(), nil
 }

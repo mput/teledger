@@ -13,7 +13,7 @@ import (
 )
 
 
-type RepoService interface {
+type Service interface {
 	OpenReader(file string) (io.ReadCloser, error)
 	OpenWriter(file string) (io.WriteCloser, error)
 	// Commit(msg string) error
@@ -41,13 +41,13 @@ func NewInMemoryRepo(url, token string) (*InMemoryRepo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to clone %s: %v", url, err)
 	}
-	// git.Repository
+
 	ref, err := r.Head()
 	if err != nil {
 		return nil, err
 	}
 
-	slog.Info("repo clonned", "head", ref.Hash())
+	slog.Debug("repo cloned", "head", ref.Hash(), "url", url)
 
 	return &InMemoryRepo{
 		url:    url,

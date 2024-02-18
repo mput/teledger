@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"time"
 
@@ -40,7 +39,7 @@ func (opts *Opts) Execute() error {
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
 		// If an error is returned by a handler, log it and continue going.
 		Error: func(_ *gotgbot.Bot, _ *ext.Context, err error) ext.DispatcherAction {
-			log.Println("an error occurred while handling update:", err.Error())
+			slog.Error("an error occurred while handling update:", "error", err.Error())
 			return ext.DispatcherActionNoop
 		},
 		MaxRoutines: ext.DefaultMaxRoutines,
@@ -67,7 +66,7 @@ func (opts *Opts) Execute() error {
 	if err != nil {
 		return fmt.Errorf("failed to start polling: %v",  err)
 	}
-	log.Printf("[INFO] %s has been started...\n", b.Username)
+	slog.Info("bot has been started", "bot-name", b.Username)
 	updater.Idle()
 
 	return nil
@@ -75,7 +74,7 @@ func (opts *Opts) Execute() error {
 
 func start(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	log.Printf("[INFO] %s has started a chat with the bot\n", msg.From.Username)
+	slog.Info("start chat","user", msg.From.Username)
 	if _, err := b.SendMessage(msg.Chat.Id, "Welcome to teledger bot!", nil); err != nil {
 		return fmt.Errorf("unable to send message: %w", err)
 	}
@@ -84,7 +83,7 @@ func start(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func (opts *Opts) vesrion(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	log.Printf("[INFO] version request. user=%s\n", msg.From.Username)
+	slog.Info("version request","user", msg.From.Username)
 	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("teledger v: %s", opts.Version), nil); err != nil {
 		return fmt.Errorf("unable to send message: %w", err)
 	}
@@ -93,28 +92,33 @@ func (opts *Opts) vesrion(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	log.Printf("[INFO] balance request. user=%s\n", msg.From.Username)
+	slog.Info("balance request","user", msg.From.Username)
 
-	repo, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
+	rs, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
 
 	if err != nil {
-		slog.Error("unable to init repo", "error", err)
-		b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to init repo: %v", err), nil)
-		return fmt.Errorf("unable to init repo: %w", err)
+		slog.Error("unable to init repo", "error", err, "user", msg.From.Username)
+		_, ierr := b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to init repo: %v", err), nil)
+		if ierr != nil {
+			return fmt.Errorf("unable to send message: %w", ierr)
+		}
+		return nil
 	}
 
-
-	ledger := NewLedger(repo, opts.Github.MainLedgerFile, true)
+	ledger := NewLedger(rs, opts.Github.MainLedgerFile, true)
 
 	balance, err := ledger.Execute("bal")
 
 	if err != nil {
 		slog.Error("unable to get balance", "error", err)
-		b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to get balance: %v", err), nil)
-		return fmt.Errorf("unable to get balance: %w", err)
+		_, ierr := b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to get balance: %v", err), nil)
+		if ierr != nil {
+			return fmt.Errorf("unable to send message: %w", ierr)
+		}
+		return nil
 	}
 
-	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}); err != nil {
+	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "Markdown2"}); err != nil {
 		return fmt.Errorf("unable to send message: %w", err)
 	}
 	return nil
@@ -123,7 +127,7 @@ func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func message(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	log.Printf("[INFO] %s has sent a message to the bot\n", msg.From.Username)
+	slog.Info("new message to the bot","user", msg.From.Username)
 	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("Message received! (%s)", msg.Text), nil); err != nil {
 		return fmt.Errorf("unable to send message: %w", err)
 	}
