@@ -3,6 +3,7 @@ package repo
 import (
 	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
@@ -40,6 +41,13 @@ func NewInMemoryRepo(url, token string) (*InMemoryRepo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to clone %s: %v", url, err)
 	}
+	// git.Repository
+	ref, err := r.Head()
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("repo clonned", "head", ref.Hash())
 
 	return &InMemoryRepo{
 		url:    url,

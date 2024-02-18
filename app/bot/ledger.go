@@ -19,9 +19,9 @@ type Ledger struct {
 	strict bool
 }
 
-func NewLedger(repo repo.RepoService, mainFile string, strict bool) *Ledger {
+func NewLedger(rs repo.RepoService, mainFile string, strict bool) *Ledger {
 	return &Ledger{
-		repo: repo,
+		repo: rs,
 		mainFile: mainFile,
 		strict: strict,
 	}
@@ -29,8 +29,8 @@ func NewLedger(repo repo.RepoService, mainFile string, strict bool) *Ledger {
 
 const ledgerBinary = "ledger"
 
-func resolveIncludesReader(repo repo.RepoService, file string) (io.ReadCloser, error) {
-	ledgerFile, err := repo.OpenReader(file)
+func resolveIncludesReader(rs repo.RepoService, file string) (io.ReadCloser, error) {
+	ledgerFile, err := rs.OpenReader(file)
 	if err != nil {
 		return nil, err
 	}
@@ -43,32 +43,37 @@ func resolveIncludesReader(repo repo.RepoService, file string) (io.ReadCloser, e
 		if top {
 			defer w.Close()
 		}
-		if err != nil {
-			w.CloseWithError(fmt.Errorf("unable to open file: %v", err))
-			return
-		}
-		defer ledgerFile.Close()
+
+		lcnt := 0
 		scanner := bufio.NewScanner(ledReader)
 		for scanner.Scan() {
 			line := scanner.Text()
+			lcnt++
 			linetr := strings.TrimSpace(line)
 			if strings.HasPrefix(linetr, "include") {
 				path := strings.TrimPrefix(linetr, "include")
 				path = strings.TrimSpace(path)
-				ir, rerr := repo.OpenReader(path)
+				ir, rerr := rs.OpenReader(path)
 				if rerr == nil {
 					f(ir, false)
 					continue
 				}
-				slog.Warn("unable to open include file", "file", path, "error", rerr)
 				// line will be used as is so ledger will report the error if it's actually an include
+				slog.Warn("unable to open include file", "file", path, "error", rerr)
 			}
 			_, err := fmt.Fprintln(w, line)
 			if err != nil {
+				slog.Error("unable to write to pipe", "error", err)
 				w.CloseWithError(fmt.Errorf("unable to write to pipe: %v", err))
 				return
 			}
 		}
+		if err := scanner.Err(); err != nil {
+			slog.Error("unable to read ledger file", "error", err)
+			w.CloseWithError(fmt.Errorf("unable to read ledger file: %v", err))
+			return
+		}
+		slog.Debug("finish ledger file read", "file", file, "top", top, "lines", lcnt)
 	}
 
 	go f(ledgerFile, true)
