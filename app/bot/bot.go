@@ -118,7 +118,7 @@ func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 
-	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "Markdown2"}); err != nil {
+	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}); err != nil {
 		return fmt.Errorf("unable to send message: %w", err)
 	}
 	return nil
