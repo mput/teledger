@@ -51,6 +51,7 @@ func (opts *Opts) Execute() error {
 	dispatcher.AddHandler(handlers.NewCommand("start", start))
 	dispatcher.AddHandler(handlers.NewCommand("bal", opts.bal))
 	dispatcher.AddHandler(handlers.NewCommand("version", opts.vesrion))
+	dispatcher.AddHandler(handlers.NewCommand("/", opts.comment))
 	dispatcher.AddHandler(handlers.NewMessage(nil, message))
 
 	// Start receiving updates.
@@ -119,6 +120,71 @@ func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}); err != nil {
+		return fmt.Errorf("unable to send message: %w", err)
+	}
+	return nil
+}
+
+func (opts *Opts) comment(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+
+	rs, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
+
+	if err != nil {
+		slog.Error("unable to init repo", "error", err, "user", msg.From.Username)
+		_, ierr := b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to init repo: %v", err), nil)
+		if ierr != nil {
+			return fmt.Errorf("unable to send message: %w", ierr)
+		}
+		return nil
+	}
+
+	f, err := rs.OpenForAppend(opts.Github.MainLedgerFile)
+
+	if err != nil {
+		slog.Error("unable to open main ledger file", "error", err, "user", msg.From.Username)
+		_, ierr := b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to open main ledger file: %v", err), nil)
+		if ierr != nil {
+			return fmt.Errorf("unable to send message: %w", ierr)
+		}
+		return nil
+	}
+
+	comment := fmt.Sprintf(";; %s\n", msg.Text)
+	_, err = fmt.Fprint(f, comment)
+
+	if err != nil {
+		slog.Error("unable to write main ledger file", "error", err, "user", msg.From.Username)
+		_, ierr := b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to write main ledger file: %v", err), nil)
+		if ierr != nil {
+			return fmt.Errorf("unable to send message: %w", ierr)
+		}
+		return nil
+	}
+
+	err = f.Close()
+
+	if err != nil {
+		slog.Error("unable to close main ledger file", "error", err, "user", msg.From.Username)
+		_, ierr := b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to close main ledger file: %v", err), nil)
+		if ierr != nil {
+			return fmt.Errorf("unable to send message: %w", ierr)
+		}
+		return nil
+	}
+
+	err = rs.CommitPush("new comment", msg.From.Username, "teledger@example.com")
+
+	if err != nil {
+		slog.Error("unable to commit", "error", err)
+		_, ierr := b.SendMessage(msg.Chat.Id, fmt.Sprintf("unable to commit: %v", err), nil)
+		if ierr != nil {
+			return fmt.Errorf("unable to send message: %w", ierr)
+		}
+		return nil
+	}
+
+	if _, err := b.SendMessage(msg.Chat.Id, fmt.Sprintf("Comment added:\n```%s```", comment), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}); err != nil {
 		return fmt.Errorf("unable to send message: %w", err)
 	}
 	return nil

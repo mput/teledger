@@ -90,6 +90,9 @@ func (w *WriteCloser) Close() error {
 
 func (r *InMemoryRepo) OpenFile(file string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 	wtr, err := r.repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("worktree receiving error: %v", err)
+	}
 	f, err := wtr.Filesystem.OpenFile(file, flag, perm)
 	wc := WriteCloser{
 		r: r,
