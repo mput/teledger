@@ -4,27 +4,31 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"time"
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
 
 type Service interface {
-	OpenReader(file string) (io.ReadCloser, error)
-	OpenWriter(file string) (io.WriteCloser, error)
-	// Commit(msg string) error
-
+	Open(file string) (io.ReadCloser, error)
+	OpenForAppend(file string) (io.WriteCloser, error)
+	OpenFile(file string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
+	CommitPush(msg, name, email string) error
 }
 
 type InMemoryRepo struct {
 	url    string
 	token  string
-	fs     *billy.Filesystem
 	repo   *git.Repository
+	dirtyFiles map[string]bool
 }
 
 func NewInMemoryRepo(url, token string) (*InMemoryRepo, error) {
@@ -52,15 +56,122 @@ func NewInMemoryRepo(url, token string) (*InMemoryRepo, error) {
 	return &InMemoryRepo{
 		url:    url,
 		token:  token,
-		fs:     &fs,
 		repo:   r,
+		dirtyFiles: make(map[string]bool),
 	}, nil
 }
 
-func (r *InMemoryRepo) OpenReader(file string) (io.ReadCloser, error) {
-	return (*r.fs).Open(file)
+func (r *InMemoryRepo) Open(file string) (io.ReadCloser, error) {
+	wtr, err := r.repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("worktree receiving error: %v", err)
+	}
+	return wtr.Filesystem.Open(file)
 }
 
-func (r *InMemoryRepo) OpenWriter(file string) (io.WriteCloser, error) {
-	return (*r.fs).Create(file)
+type WriteCloser struct {
+	f *billy.File
+	r *InMemoryRepo
+	path string
+}
+
+func (w *WriteCloser) Write(p []byte) (n int, err error) {
+	return (*w.f).Write(p)
+}
+
+func (w *WriteCloser) Read(p []byte) (n int, err error) {
+	return (*w.f).Read(p)
+}
+
+func (w *WriteCloser) Close() error {
+	w.r.dirtyFiles[w.path] = true
+	return (*w.f).Close()
+}
+
+func (r *InMemoryRepo) OpenFile(file string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+	wtr, err := r.repo.Worktree()
+	f, err := wtr.Filesystem.OpenFile(file, flag, perm)
+	wc := WriteCloser{
+		r: r,
+		path: file,
+		f: &f,
+	}
+	return &wc, err
+}
+
+
+func (r *InMemoryRepo) OpenForAppend(file string) (io.WriteCloser, error) {
+	return r.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0o666)
+}
+
+
+func (r *InMemoryRepo) CommitPush(msg, name, email string) error {
+	wtr, err := r.repo.Worktree()
+
+	if err != nil {
+		return fmt.Errorf("worktree receiving error: %v", err)
+	}
+
+	for file, dirty := range r.dirtyFiles {
+		if dirty {
+			_, err = wtr.Add(file)
+			if err != nil {
+				return fmt.Errorf("error while adding to worktree: %v", err)
+			}
+		}
+	}
+	_, err = wtr.Commit(msg, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  name,
+			Email: email,
+			When:  time.Now(),
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("error while committing: %v", err)
+	}
+	err = r.repo.Push(&git.PushOptions{
+		Auth: &http.BasicAuth{
+			Username: "username",
+			Password: r.token,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("error while pushing: %v", err)
+	}
+
+	return nil
+}
+
+func (r *InMemoryRepo) resetPush(hash plumbing.Hash) error {
+	wtr, err := r.repo.Worktree()
+
+	if err != nil {
+		return fmt.Errorf("worktree receiving error: %v", err)
+	}
+
+	err = wtr.Reset(&git.ResetOptions{
+		Commit: hash,
+		Mode:   git.HardReset,
+	})
+
+	if err != nil {
+		return fmt.Errorf("error while resetting: %v", err)
+	}
+
+	err = r.repo.Push(&git.PushOptions{
+		ForceWithLease: &git.ForceWithLease{},
+		Auth: &http.BasicAuth{
+			Username: "username",
+			Password: r.token,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("error while pushing reset: %v", err)
+	}
+
+	return nil
 }

@@ -30,7 +30,7 @@ func NewLedger(rs repo.Service, mainFile string, strict bool) *Ledger {
 const ledgerBinary = "ledger"
 
 func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) {
-	ledgerFile, err := rs.OpenReader(file)
+	ledgerFile, err := rs.Open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) 
 			if strings.HasPrefix(linetr, "include") {
 				path := strings.TrimPrefix(linetr, "include")
 				path = strings.TrimSpace(path)
-				ir, rerr := rs.OpenReader(path)
+				ir, rerr := rs.Open(path)
 				if rerr == nil {
 					f(ir, false)
 					continue
