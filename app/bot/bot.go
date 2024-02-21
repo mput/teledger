@@ -3,6 +3,7 @@ package bot
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -29,19 +30,40 @@ type Opts struct {
 }
 
 
-type Response func(b *gotgbot.Bot, ctx *ext.Context) (string, error)
+type Response func(b *gotgbot.Bot, ctx *ext.Context) (msg string, opts *gotgbot.SendMessageOpts, err error)
 
-func WrapUserResponse (next Response) handlers.Response {
+func WrapUserResponse (next Response, name string) handlers.Response {
 	return func(b *gotgbot.Bot, ctx *ext.Context) error {
+		start := time.Now()
 		msg := ctx.EffectiveMessage
-		resp, err := next(b, ctx)
+		resp, opts, err := next(b, ctx)
 		if err != nil {
-			slog.Error("error in handler", "error", err)
+			slog.Error(
+				"error in bot handler",
+				"error", err,
+				"duration", time.Since(start),
+				"from",  msg.From.Username,
+				"handler", name,
+			)
+		} else {
+			slog.Info(
+				"handler success",
+				"duration", time.Since(start),
+				"from",  msg.From.Username,
+				"handler", name,
+			)
+
 		}
 		if resp != "" {
-			_, ierr := b.SendMessage(msg.Chat.Id, resp, &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"})
+			_, ierr := b.SendMessage(msg.Chat.Id, resp, opts)
 			if ierr != nil {
-				slog.Error("unable to send response", "error", ierr)
+				slog.Error(
+					"unable to send response",
+					"error", ierr,
+					"duration", time.Since(start),
+					"from",  msg.From.Username,
+					"handler", name,
+				)
 			}
 		}
 		return err
@@ -68,12 +90,12 @@ func (opts *Opts) Execute() error {
 	updater := ext.NewUpdater(dispatcher, nil)
 
 
-	dispatcher.AddHandler(handlers.NewCommand("start", WrapUserResponse(start)))
-	dispatcher.AddHandler(handlers.NewCommand("bal", WrapUserResponse(opts.bal)))
-	dispatcher.AddHandler(handlers.NewCommand("version", WrapUserResponse(opts.vesrion)))
-	dispatcher.AddHandler(handlers.NewCommand("/", WrapUserResponse(opts.comment)))
+	dispatcher.AddHandler(handlers.NewCommand("start", WrapUserResponse(start, "start")))
+	dispatcher.AddHandler(handlers.NewCommand("bal", WrapUserResponse(opts.bal, "balance")))
+	dispatcher.AddHandler(handlers.NewCommand("version", WrapUserResponse(opts.vesrion, "version")))
+	dispatcher.AddHandler(handlers.NewCommand("/", WrapUserResponse(opts.comment, "comment")))
 
-	dispatcher.AddHandler(handlers.NewMessage(nil, WrapUserResponse(echo)))
+	dispatcher.AddHandler(handlers.NewMessage(nil, WrapUserResponse(echo, "echo")))
 
 	// Start receiving updates.
 	err = updater.StartPolling(b, &ext.PollingOpts{
@@ -94,20 +116,20 @@ func (opts *Opts) Execute() error {
 	return nil
 }
 
-func start(b *gotgbot.Bot, ctx *ext.Context) (string, error) {
-	return "Welcome to teledger bot!", nil
+func start(b *gotgbot.Bot, ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
+	return "Welcome to teledger bot!", nil, nil
 }
 
-func (opts *Opts) vesrion(b *gotgbot.Bot, ctx *ext.Context) (string, error) {
-	return fmt.Sprintf("teledger v: %s", opts.Version), nil
+func (opts *Opts) vesrion(_ *gotgbot.Bot, _ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
+	return fmt.Sprintf("teledger v: %s", opts.Version), nil , nil
 }
 
-func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) (string, error) {
+func (opts *Opts) bal(_ *gotgbot.Bot, _ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	rs, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
 
 	if err != nil {
 		werr := fmt.Errorf("unable to init repo: %w", err)
-		return werr.Error(), werr
+		return werr.Error(), nil, werr
 	}
 
 	ledger := NewLedger(rs, opts.Github.MainLedgerFile, true)
@@ -116,57 +138,75 @@ func (opts *Opts) bal(b *gotgbot.Bot, ctx *ext.Context) (string, error) {
 
 	if err != nil {
 		werr := fmt.Errorf("unable to get balance: %v", err)
-		return werr.Error(), werr
+		return werr.Error(), nil, werr
 	}
 
-	return fmt.Sprintf("```%s```", balance), nil
+	return fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }
 
-func (opts *Opts) comment(b *gotgbot.Bot, ctx *ext.Context) (string, error) {
+func (opts *Opts) comment(b *gotgbot.Bot, ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	msg := ctx.EffectiveMessage
 
 	rs, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
 
 	if err != nil {
 		werr := fmt.Errorf("unable to init repo: %w", err)
-		return werr.Error(), werr
+		return werr.Error(), nil, werr
 	}
 
 	f, err := rs.OpenForAppend(opts.Github.MainLedgerFile)
 
 	if err != nil {
 		werr := fmt.Errorf("unable to open main ledger file: %v", err)
-		return werr.Error(), werr
+		return werr.Error(), nil, werr
 	}
 
 	// TODO: add comment prefix to every line
-	comment := fmt.Sprintf(";; %s\n", msg.Text)
-	_, err = fmt.Fprint(f, comment)
+	timezoneName := "CET"
+	loc, err := time.LoadLocation(timezoneName)
+	if err != nil {
+		return err.Error(), nil, err
+	}
+
+	lines := []string{fmt.Sprintf(";; %s", time.Now().In(loc).Format("2006-01-02 15:04:05 Monday"))}
+	commitLine := ""
+
+	for i, l := range strings.Split(msg.Text, "\n") {
+		if i == 0 {
+			l, _ = strings.CutPrefix(l, "// ")
+			commitLine = l
+		}
+		lines = append(lines, fmt.Sprintf(";; %s", l))
+	}
+
+	comment := strings.Join(lines, "\n")
+
+	_, err = fmt.Fprintf(f, "\n%s\n", comment)
 
 	if err != nil {
 		werr := fmt.Errorf("unable to write main ledger file: %v", err)
-		return werr.Error(), werr
+		return werr.Error(), nil, werr
 	}
 
 	err = f.Close()
 
 	if err != nil {
 		werr := fmt.Errorf("unable to close main ledger file: %v", err)
-		return werr.Error(), werr
+		return werr.Error(), nil, werr
 	}
 
-	err = rs.CommitPush("new comment", msg.From.Username, "teledger@example.com")
+	err = rs.CommitPush(fmt.Sprintf("comment: %s", commitLine), msg.From.Username, "teledger@example.com")
 
 	if err != nil {
 		werr := fmt.Errorf("unable to commit: %v", err)
-		return werr.Error(), werr
+		return werr.Error(), nil, werr
 	}
 
-	return fmt.Sprintf("Comment added:\n```%s```", comment), nil
+	return fmt.Sprintf("Commented:\n```\n%s\n```", comment), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }
 
 
-func echo(b *gotgbot.Bot, ctx *ext.Context) (string, error) {
+func echo(b *gotgbot.Bot, ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	msg := ctx.EffectiveMessage
-	return fmt.Sprintf("Message received! (%s)", msg.Text), nil
+	return fmt.Sprintf("Message received! (%s)", msg.Text), nil, nil
 }
