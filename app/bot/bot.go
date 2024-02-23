@@ -78,6 +78,20 @@ func (opts *Opts) Execute() error {
 		return fmt.Errorf("unable to create bot: %v", err)
 	}
 
+	defaultCommands := []gotgbot.BotCommand{
+		{Command: "start", Description: "Start the bot"},
+		{Command: "balance", Description: "Show balance"},
+		{Command: "comment", Description: "Comment on the ledger"},
+		{Command: "version", Description: "Show version"},
+	}
+
+	smcRes, err := b.SetMyCommands(defaultCommands, nil)
+
+	if err != nil {
+		return fmt.Errorf("unable to set commands: %v", err)
+	}
+	slog.Info("commands has been set", "result", smcRes)
+
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
 		// If an error is returned by a handler, log it and continue going.
 		Error: func(_ *gotgbot.Bot, _ *ext.Context, err error) ext.DispatcherAction {
@@ -91,11 +105,13 @@ func (opts *Opts) Execute() error {
 
 
 	dispatcher.AddHandler(handlers.NewCommand("start", WrapUserResponse(start, "start")))
-	dispatcher.AddHandler(handlers.NewCommand("bal", WrapUserResponse(opts.bal, "balance")))
+	dispatcher.AddHandler(handlers.NewCommand("balance", WrapUserResponse(opts.bal, "balance")))
 	dispatcher.AddHandler(handlers.NewCommand("version", WrapUserResponse(opts.vesrion, "version")))
 	dispatcher.AddHandler(handlers.NewCommand("/", WrapUserResponse(opts.comment, "comment")))
+	dispatcher.AddHandler(handlers.NewCommand("comment", WrapUserResponse(opts.comment, "comment")))
 
 	dispatcher.AddHandler(handlers.NewMessage(nil, WrapUserResponse(echo, "echo")))
+
 
 	// Start receiving updates.
 	err = updater.StartPolling(b, &ext.PollingOpts{
@@ -147,20 +163,6 @@ func (opts *Opts) bal(_ *gotgbot.Bot, _ *ext.Context) (string, *gotgbot.SendMess
 func (opts *Opts) comment(b *gotgbot.Bot, ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	msg := ctx.EffectiveMessage
 
-	rs, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
-
-	if err != nil {
-		werr := fmt.Errorf("unable to init repo: %w", err)
-		return werr.Error(), nil, werr
-	}
-
-	f, err := rs.OpenForAppend(opts.Github.MainLedgerFile)
-
-	if err != nil {
-		werr := fmt.Errorf("unable to open main ledger file: %v", err)
-		return werr.Error(), nil, werr
-	}
-
 	// TODO: add comment prefix to every line
 	timezoneName := "CET"
 	loc, err := time.LoadLocation(timezoneName)
@@ -173,10 +175,40 @@ func (opts *Opts) comment(b *gotgbot.Bot, ctx *ext.Context) (string, *gotgbot.Se
 
 	for i, l := range strings.Split(msg.Text, "\n") {
 		if i == 0 {
-			l, _ = strings.CutPrefix(l, "// ")
-			commitLine = l
+			l = strings.TrimSpace(l)
+			sl := strings.SplitN(l, " ", 2)
+			fmt.Println(sl)
+			if len(sl) > 2 {
+				panic(fmt.Errorf("unexpected strings.SplitN(l, \" \", 2) result: %v", sl))
+			}
+			if len(sl) == 2 {
+				l = sl[1]
+				commitLine = l
+			} else {
+				l = ""
+			}
 		}
-		lines = append(lines, fmt.Sprintf(";; %s", l))
+		if l != "" {
+			lines = append(lines, fmt.Sprintf(";; %s", l))
+		}
+	}
+
+	if len(lines) == 1 {
+		return "No comment provided", nil, nil
+	}
+
+	rs, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
+
+	if err != nil {
+		werr := fmt.Errorf("unable to init repo: %w", err)
+		return werr.Error(), nil, werr
+	}
+
+	f, err := rs.OpenForAppend(opts.Github.MainLedgerFile)
+
+	if err != nil {
+		werr := fmt.Errorf("unable to open main ledger file: %v", err)
+		return werr.Error(), nil, werr
 	}
 
 	comment := strings.Join(lines, "\n")
