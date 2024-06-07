@@ -1,2 +1,19 @@
 ## Teledger
-Service which should combine powerfull double-entry accounting system [ledger](https://ledger-cli.org/), with reliability of a git as a Ledger file storage, and convenience of data entry using Telegram and OpenAI LLM.
+Service which should combine powerful double-entry accounting system [ledger](https://ledger-cli.org/), with reliability of a git as a Ledger file storage, and convenience of data entry using Telegram and OpenAI LLM.
+
+## Development
+Create `.env.dev` by copying `.env.example` and fill in the values.
+```bash
+cp .env.example .env.dev
+```
+
+Source the `.env.dev` file to set the environment variables
+```bash
+source .env.dev
+```
+
+Start the service
+```bash
+go run app/main.go
+```
+
