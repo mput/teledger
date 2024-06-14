@@ -197,6 +197,9 @@ func (opts *Opts) comment(b *gotgbot.Bot, ctx *ext.Context) (string, *gotgbot.Se
 		return "No comment provided", nil, nil
 	}
 
+	// add a template for the transaction
+	lines = append(lines, fmt.Sprintf(";; %s *", time.Now().In(loc).Format("2006-01-02")))
+
 	rs, err := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
 
 	if err != nil {
