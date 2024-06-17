@@ -62,7 +62,6 @@ include commodities.ledger
 			"commodities.ledger": `
 commodity EUR
 `,
-
 		}
 		repomock := &repo.Mock{
 			Files: files,
@@ -87,5 +86,83 @@ commodity EUR
 		}
 
 	})
+
+}
+
+
+func TestLedger_AddTransaction(t *testing.T) {
+	t.Run("success path", func(t *testing.T) {
+		t.Parallel()
+
+		testFile := `
+2024-02-13 * Test
+  Assets:Cash  100.00 EUR
+  Equity
+`
+
+		ledger := NewLedger(
+			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
+			"main.ledger",
+			false,
+		)
+
+
+		err := ledger.AddTransaction(`
+2024-02-14 * Test
+  Assets:Cash  42.00 EUR
+  Equity
+`)
+
+		if err != nil {
+			t.Fatalf("Error: %v", err)
+		}
+
+		res, err := ledger.Execute("bal")
+
+		if err != nil {
+			t.Fatalf("Error: %v", err)
+		}
+
+		expected := strings.TrimSpace(`
+          142.00 EUR  Assets:Cash
+         -142.00 EUR  Equity
+--------------------
+                   0`)
+
+		if strings.TrimSpace(res) != expected {
+			t.Fatalf("Expected: '%s', got: '%s'", expected, res)
+		}
+
+
+		err = ledger.AddTransaction(`
+dummy
+`)
+		if err == nil {
+			t.Fatalf("Expected error")
+		}
+
+
+		err = ledger.AddTransaction(`
+dummy dummy
+`)
+		if err == nil {
+			t.Fatalf("Expected error")
+		}
+
+		err = ledger.AddTransaction(``)
+		if err == nil {
+			t.Fatalf("Expected error")
+		}
+
+
+		err = ledger.AddTransaction(`
+
+`)
+		if err == nil {
+			t.Fatalf("Expected error")
+		}
+
+	})
+
 
 }

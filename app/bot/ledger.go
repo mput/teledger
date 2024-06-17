@@ -130,3 +130,27 @@ func (l *Ledger) Execute(args ...string) (result string,err error) {
 	}
 	return out.String(), nil
 }
+
+func (l *Ledger) AddTransaction(transaction string) error {
+	balBefore, err := l.Execute("balance")
+	if err != nil {
+		return err
+	}
+	r, err := l.repo.OpenForAppend(l.mainFile)
+	if err != nil {
+		return fmt.Errorf("unable to open main ledger file: %v", err)
+	}
+	_, err = fmt.Fprintf(r, "\n%s\n", transaction)
+	r.Close()
+	if err != nil {
+		return fmt.Errorf("unable to write main ledger file: %v", err)
+	}
+	balAfter, err :=l.Execute("balance")
+	if err != nil {
+		return err
+	}
+	if balBefore == balAfter {
+		return fmt.Errorf("transaction doesn't change balance")
+	}
+	return nil
+}
