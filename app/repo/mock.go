@@ -10,9 +10,25 @@ import (
 
 type Mock struct {
 	Files map[string]string
+	inited bool
+}
+
+func (r *Mock) Init() error {
+	if r.inited {
+		return fmt.Errorf("already initialized")
+	}
+	r.inited = true
+	return nil
+}
+
+func (r *Mock) Free() {
+	r.inited = false
 }
 
 func (r *Mock) Open(file string) (io.ReadCloser, error) {
+	if !r.inited {
+		return nil, fmt.Errorf("not initialized")
+	}
 	if content, ok := r.Files[file]; ok {
 		return io.NopCloser(strings.NewReader(content)), nil
 	}
@@ -20,10 +36,16 @@ func (r *Mock) Open(file string) (io.ReadCloser, error) {
 }
 
 func (r *Mock) OpenFile(_ string, _ int, _ os.FileMode) (io.ReadWriteCloser, error) {
+	if !r.inited {
+		return nil, fmt.Errorf("not initialized")
+	}
 	return nil, fmt.Errorf("not implemented")
 }
 
 func (r *Mock) OpenForAppend(file string) (io.WriteCloser, error) {
+	if !r.inited {
+		return nil, fmt.Errorf("not initialized")
+	}
 	if content, ok := r.Files[file]; ok {
 		return &WriteCloserT{r: r, f: file, dt: []byte(content)}, nil
 	}

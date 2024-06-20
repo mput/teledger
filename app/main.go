@@ -39,8 +39,15 @@ func main() {
 	}
 	setupLogger(opts.Debug)
 
-	err = opts.Execute()
+	nbot, err := bot.NewBot(&opts)
+	if err != nil {
+		slog.Error("unable to create bot: %v", err)
+	}
+
+	// TODO: handle signals
+	err = nbot.Start()
 	if err != nil {
 		slog.Error("unable to start bot: %v", err)
 	}
+
 }

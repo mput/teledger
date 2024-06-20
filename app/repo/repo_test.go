@@ -37,7 +37,9 @@ func TestNewInMemoryRepo(t *testing.T) {
 		t.Fatal("GIT_ACCESS_TOKEN is not set")
 	}
 
-	repo, err := NewInMemoryRepo(gitURL, gitToken)
+	repo := NewInMemoryRepo(gitURL, gitToken)
+
+	err := repo.Init()
 
 	if err != nil {
 		t.Fatalf("unable to init repo: %v", err)
@@ -99,16 +101,19 @@ func TestNewInMemoryRepo(t *testing.T) {
 
 		t.Cleanup(func() {
 			err = repo.resetPush(hash)
+			repo.Free()
 			if err != nil {
 				t.Fatal(err)
 			}
 		})
 
-		newRepo, err := NewInMemoryRepo(gitURL, gitToken)
+		newRepo := NewInMemoryRepo(gitURL, gitToken)
+		err = newRepo.Init()
 
 		if !strings.HasSuffix(checkReadString(t, newRepo, "main.ledger"), line) {
 			t.Fatal("Reader doesn't contains committed string")
 		}
+		newRepo.Free()
 
 
 	})

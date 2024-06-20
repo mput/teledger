@@ -1,4 +1,4 @@
-package bot
+package ledger
 
 import (
 	"strings"
@@ -12,7 +12,7 @@ func TestLedger_Execute(t *testing.T) {
 	t.Run("one file", func(t *testing.T) {
 		t.Parallel()
 
-		testFile := `
+		const testFile = `
 2024-02-13 * Test
   Assets:Cash  100.00 EUR
   Equity
@@ -163,6 +163,4 @@ dummy dummy
 		}
 
 	})
-
-
 }

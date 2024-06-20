@@ -1,4 +1,4 @@
-package bot
+package ledger
 
 import (
 	"bufio"
@@ -12,7 +12,7 @@ import (
 	"github.com/mput/teledger/app/repo"
 )
 
-
+// Ledger is a wrapper around the ledger command line tool
 type Ledger struct {
 	repo repo.Service
 	mainFile string
@@ -82,8 +82,7 @@ func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) 
 
 }
 
-
-func (l *Ledger) Execute(args ...string) (result string,err error) {
+func (l *Ledger) execute(args ...string) (string, error) {
 	r, err := resolveIncludesReader(l.repo, l.mainFile)
 
 	if err != nil {
@@ -131,8 +130,26 @@ func (l *Ledger) Execute(args ...string) (result string,err error) {
 	return out.String(), nil
 }
 
+
+func (l *Ledger) Execute(args ...string) (string, error) {
+	err := l.repo.Init()
+	defer l.repo.Free()
+	if err != nil {
+		return "", fmt.Errorf("unable to init repo: %v", err)
+	}
+
+	return l.execute(args...)
+}
+
 func (l *Ledger) AddTransaction(transaction string) error {
-	balBefore, err := l.Execute("balance")
+	err := l.repo.Init()
+	defer l.repo.Free()
+	if err != nil {
+		return fmt.Errorf("unable to init repo: %v", err)
+	}
+
+
+	balBefore, err := l.execute("balance")
 	if err != nil {
 		return err
 	}
@@ -145,7 +162,7 @@ func (l *Ledger) AddTransaction(transaction string) error {
 	if err != nil {
 		return fmt.Errorf("unable to write main ledger file: %v", err)
 	}
-	balAfter, err :=l.Execute("balance")
+	balAfter, err :=l.execute("balance")
 	if err != nil {
 		return err
 	}
@@ -153,4 +170,56 @@ func (l *Ledger) AddTransaction(transaction string) error {
 		return fmt.Errorf("transaction doesn't change balance")
 	}
 	return nil
+}
+
+func (l *Ledger) validate() error {
+	_, err := l.execute("balance")
+	return err
+}
+
+
+func (l *Ledger) AddComment(comment string) (string, error) {
+	err := l.repo.Init()
+	defer l.repo.Free()
+	if err != nil {
+		return "", fmt.Errorf("unable to init repo: %v", err)
+	}
+
+	r, err := l.repo.OpenForAppend(l.mainFile)
+	if err != nil {
+		return "", fmt.Errorf("unable to open main ledger file: %v", err)
+	}
+
+	lines := make([]string, 0)
+
+	for _, l := range strings.Split(comment, "\n") {
+		if l != "" {
+			lines = append(lines, fmt.Sprintf(";; %s", l))
+		}
+	}
+
+	if len(lines) == 1 {
+		return "", fmt.Errorf("empty comment provided")
+	}
+
+	res := strings.Join(lines, "\n")
+
+	_, err = fmt.Fprintf(r, "\n%s\n", res)
+
+	if err != nil {
+		return "", fmt.Errorf("unable to write main ledger file: %v", err)
+	}
+
+	err = l.validate()
+	r.Close()
+	if err != nil {
+		return "", fmt.Errorf("ledger file become invalid after an attempt to add comment: %v", err)
+	}
+
+	err = l.repo.CommitPush(fmt.Sprintf("comment: %s", lines[0]), "teledger", "teledger@example.com")
+	if err != nil {
+		return "", fmt.Errorf("unable to commit: %v", err)
+
+	}
+	return res, nil
 }
