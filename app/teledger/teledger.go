@@ -51,3 +51,16 @@ func (tel *Teledger) AddComment(comment string) (string, error) {
 func (tel *Teledger) Balance() (string, error) {
 	return tel.ledger.Execute("bal")
 }
+
+
+// // Receive a short free-text description of a transaction
+// // and propose a formatted transaction validated with the
+// // ledger file.
+// // Store the transaction in a state, so the user can confirm
+// // or reject it.
+// func (tel *Teledger) proposeTransaction(desc string) (string, error) {
+// 	prompt := fmt.Sprintf("Proposed transaction:\n```\n%s\n```", desc)
+// 	structuredTrx, err := tel.openai.GetStructuredResponse(desc, &transaction{})
+// 	trx := structuredTrx.toString()
+
+// }

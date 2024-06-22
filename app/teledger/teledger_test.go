@@ -25,6 +25,7 @@ func TestTeledger_AddComment(t *testing.T) {
 
 		l := ledger.NewLedger(
 			r,
+			nil,
 			"main.ledger",
 			false,
 		)

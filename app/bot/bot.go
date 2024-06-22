@@ -44,7 +44,7 @@ func NewBot(opts *Opts) (*Bot, error) {
 	}
 
 	rs := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
-	ldgr := ledger.NewLedger(rs, opts.Github.MainLedgerFile, true)
+	ldgr := ledger.NewLedger(rs, nil, opts.Github.MainLedgerFile, true)
 	tel := teledger.NewTeledger(ldgr)
 
 	return &Bot{

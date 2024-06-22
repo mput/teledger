@@ -3,8 +3,10 @@ package ledger
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mput/teledger/app/repo"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLedger_Execute(t *testing.T) {
@@ -20,6 +22,7 @@ func TestLedger_Execute(t *testing.T) {
 
 		ledger := NewLedger(
 			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
+			nil,
 			"main.ledger",
 			false,
 		)
@@ -67,7 +70,7 @@ commodity EUR
 			Files: files,
 		}
 
-		ledger := NewLedger(repomock, "main.ledger", true)
+		ledger := NewLedger(repomock, nil, "main.ledger", true)
 
 		res, err := ledger.Execute("bal")
 
@@ -89,7 +92,6 @@ commodity EUR
 
 }
 
-
 func TestLedger_AddTransaction(t *testing.T) {
 	t.Run("success path", func(t *testing.T) {
 		t.Parallel()
@@ -102,10 +104,10 @@ func TestLedger_AddTransaction(t *testing.T) {
 
 		ledger := NewLedger(
 			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
+			nil,
 			"main.ledger",
 			false,
 		)
-
 
 		err := ledger.AddTransaction(`
 2024-02-14 * Test
@@ -133,14 +135,12 @@ func TestLedger_AddTransaction(t *testing.T) {
 			t.Fatalf("Expected: '%s', got: '%s'", expected, res)
 		}
 
-
 		err = ledger.AddTransaction(`
 dummy
 `)
 		if err == nil {
 			t.Fatalf("Expected error")
 		}
-
 
 		err = ledger.AddTransaction(`
 dummy dummy
@@ -154,13 +154,80 @@ dummy dummy
 			t.Fatalf("Expected error")
 		}
 
-
 		err = ledger.AddTransaction(`
 
 `)
 		if err == nil {
 			t.Fatalf("Expected error")
 		}
+
+	})
+}
+
+
+func TestLedger_ProposeTransaction(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+
+		mockedTransactionGenerator := &TransactionGeneratorMock{
+			GenerateTransactionFunc: func(promptCtx PromptCtx) (Transaction, error) {
+				dt, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26.371Z")
+				tr := Transaction{
+					Date: dt,
+					Description: "My tr",
+					Postings: []Posting{
+						Posting{
+							Account: "cash",
+							Amount: -30.43,
+							Currency: "EUR",
+						},
+						Posting{
+							Account: "taxi",
+							Amount: 30.43,
+							Currency: "EUR",
+						},
+					},
+				}
+				return tr, nil
+			},
+		}
+
+		const testFile = `
+2024-02-13 * Test
+  Assets:Cash  100.00 EUR
+  Equity
+`
+
+		ledger := NewLedger(
+			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
+			mockedTransactionGenerator,
+			"main.ledger",
+			false,
+		)
+
+		tr, err := ledger.ProposeTransaction("20 Taco Bell")
+
+
+		assert.NoError(t, err)
+
+		assert.Equal(t,
+			`2014-11-12 My tr
+    cash    -30.43 EUR
+    taxi     30.43 EUR
+`,
+			tr,
+		)
+
+		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 1)
+
+
+		assert.Equal(t,
+			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx,
+			PromptCtx{
+				Accounts:  []string{"Assets:Cards:Wise-EUR", "Assets:Cards:Wise-USD", "Assets:Cards:Wise-RUB"},
+				UserInput: "20 Taco Bell",
+			},
+		)
+
 
 	})
 }

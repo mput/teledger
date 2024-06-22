@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/mput/teledger/app/repo"
 )
@@ -17,11 +18,13 @@ type Ledger struct {
 	repo repo.Service
 	mainFile string
 	strict bool
+	generator TransactionGenerator
 }
 
-func NewLedger(rs repo.Service, mainFile string, strict bool) *Ledger {
+func NewLedger(rs repo.Service,gen TransactionGenerator , mainFile string, strict bool) *Ledger {
 	return &Ledger{
 		repo: rs,
+		generator: gen,
 		mainFile: mainFile,
 		strict: strict,
 	}
@@ -223,3 +226,112 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 	}
 	return res, nil
 }
+
+// Transaction represents a single transaction in a ledger.
+type Transaction struct {
+	Date        time.Time `json:"date"`         // The date of the transaction
+	Description string    `json:"description"`  // A description of the transaction
+	Postings    []Posting `json:"postings"`     // A slice of postings that belong to this transaction
+}
+
+func (t Transaction) toString() string {
+	var res strings.Builder
+	res.WriteString(fmt.Sprintf("%s %s\n", t.Date.Format("2006-01-02"), t.Description))
+	for _, p := range t.Postings {
+		// format float to 2 decimal places
+		res.WriteString(fmt.Sprintf("    %s  %8.2f %s\n", p.Account, p.Amount, p.Currency))
+
+	}
+	return res.String()
+}
+
+// Posting represents a single posting in a transaction, linking an account with an amount and currency.
+type Posting struct {
+	Account  string  `json:"account"`  // The name of the account
+	Amount   float64 `json:"amount"`   // The amount posted to the account
+	Currency string  `json:"currency"` // The currency of the amount
+}
+
+// TransactionGenerator is an interface for generating transactions from user input
+// using LLM.
+//go:generate moq -out  transaction_generator_mock.go -with-resets . TransactionGenerator
+type TransactionGenerator interface {
+	GenerateTransaction(promptCtx PromptCtx) (Transaction, error)
+}
+
+type OpenAITransactionGenerator struct {
+	token string
+}
+
+func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Transaction, error) {
+	return Transaction{}, nil
+}
+
+
+// Receive a short free-text description of a transaction
+// and returns a formatted transaction validated with the
+// ledger file.
+func (l *Ledger) ProposeTransaction(userInput string) (string, error) {
+	err := l.repo.Init()
+	defer l.repo.Free()
+	if err != nil {
+		return "", err
+	}
+
+	accounts := []string{"Assets:Cards:Wise-EUR", "Assets:Cards:Wise-USD", "Assets:Cards:Wise-RUB"}
+
+	promptCtx := PromptCtx{
+		Accounts: accounts,
+		UserInput: userInput,
+	}
+
+	trx, err := l.generator.GenerateTransaction(promptCtx)
+	if err != nil {
+		return "", fmt.Errorf("unable to generate transaction: %v", err)
+	}
+
+	return trx.toString(), nil
+
+}
+
+
+type PromptCtx struct {
+	Accounts []string
+	UserInput string
+}
+
+
+const template = `
+Your goal is to propose a transaction in the ledger cli format.
+Your responses MUST be in JSON and adhere to the Transaction struct ONLY with no additional narrative or markup, backquotes or anything.
+
+Bellow is the list of accounts you MUST use in your transaction:
+{{range .Accounts}}
+"{{.}}"
+{{end}}
+
+
+Use "EUR" as the default currency if nothing else is specified in user request.
+Another possible currency is "USD", "RUB".
+All descriptions should be in English.
+
+// Transaction represents a single transaction in a ledger.
+type Transaction struct {
+	Date        time.Time json:"date"         // The date of the transaction
+	Description string    json:"description"  // A description of the transaction
+	Postings    []Posting json:"postings"     // A slice of postings that belong to this transaction
+}
+
+// Posting represents a single posting in a transaction, linking an account with an amount and currency.
+type Posting struct {
+	Account  string  json:"account"  // The name of the account
+	Amount   float64 json:"amount"   // The amount posted to the account
+	Currency string  json:"currency" // The currency of the amount
+}
+
+Use Assets:Cards:Wise-EUR as default account  if nothing else is specified in user request
+
+Bellow is the message from the USER for which you need to propose a transaction:
+
+{{.UserInput}}
+`
