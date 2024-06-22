@@ -17,3 +17,9 @@ Start the service
 go run app/main.go
 ```
 
+
+## TODO
+- [ ] Propose transactions with openAI
+- [ ] Commit transaction with openAI (By pressing confirm btn)
+- [ ] Add transaction directly when a transaction typed instead of openAI
+- [ ] Add templates for reports with yaml in repo
