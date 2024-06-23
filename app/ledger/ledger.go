@@ -232,6 +232,7 @@ type Transaction struct {
 	Date        time.Time `json:"date"`         // The date of the transaction
 	Description string    `json:"description"`  // A description of the transaction
 	Postings    []Posting `json:"postings"`     // A slice of postings that belong to this transaction
+	Comment	    string
 }
 
 func (t Transaction) toString() string {
@@ -267,36 +268,143 @@ func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Tr
 	return Transaction{}, nil
 }
 
+func parseCommodityOrAccount(ledger io.Reader, directive string) ([]string, error) {
+	if directive != "commodity" && directive != "account" {
+		panic("unsupported directive")
+	}
+	scanner := bufio.NewScanner(ledger)
+	var res []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, directive) {
+			v := strings.TrimSpace(strings.TrimPrefix(line, directive))
+			res = append(res, v)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("unable to read ledger file: %v", err)
+	}
+	return res, nil
+}
+
+func (l *Ledger) extractAccounts() ([]string, error) {
+	r, err := resolveIncludesReader(l.repo, l.mainFile)
+	if err != nil {
+		return nil, err
+	}
+
+	accs, err := parseCommodityOrAccount(r, "account")
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract accounts from directives: %v", err)
+	}
+
+
+	accsFromTrxsS, err := l.execute("accounts")
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract accounts from transactions: %v", err)
+	}
+	accsFromTrxs := strings.Split(strings.TrimSpace(accsFromTrxsS), "\n")
+
+
+	accs = append(accs, accsFromTrxs...)
+	accsdedup := make([]string, 0)
+	accsmap := make(map[string]struct{})
+	for _, a := range accs {
+		if _, ok := accsmap[a]; !ok {
+			accsmap[a] = struct{}{}
+			accsdedup = append(accsdedup, a)
+		}
+	}
+	return accsdedup, nil
+}
+
+func (l *Ledger) extractCommodities() ([]string, error) {
+	r, err := resolveIncludesReader(l.repo, l.mainFile)
+	if err != nil {
+		return nil, err
+	}
+
+	coms, err := parseCommodityOrAccount(r, "commodity")
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract accounts from directives: %v", err)
+	}
+
+
+	comsFromTrxsS, err := l.execute("commodities")
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract accounts from transactions: %v", err)
+	}
+	comsFromTrxs := strings.Split(strings.TrimSpace(comsFromTrxsS), "\n")
+
+
+	coms = append(coms, comsFromTrxs...)
+	dedup := make([]string, 0)
+	dedupm := make(map[string]struct{})
+	for _, a := range coms {
+		if _, ok := dedupm[a]; !ok {
+			dedupm[a] = struct{}{}
+			dedup = append(dedup, a)
+		}
+	}
+	return dedup, nil
+}
+
 
 // Receive a short free-text description of a transaction
 // and returns a formatted transaction validated with the
 // ledger file.
-func (l *Ledger) ProposeTransaction(userInput string) (string, error) {
-	err := l.repo.Init()
-	defer l.repo.Free()
+func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
+	accounts, err := l.extractAccounts()
 	if err != nil {
-		return "", err
+		return Transaction{}, err
 	}
 
-	accounts := []string{"Assets:Cards:Wise-EUR", "Assets:Cards:Wise-USD", "Assets:Cards:Wise-RUB"}
+	commodities, err := l.extractCommodities()
+	if err != nil {
+		return Transaction{}, err
+	}
+
 
 	promptCtx := PromptCtx{
 		Accounts: accounts,
+		Commodities: commodities,
 		UserInput: userInput,
 	}
 
 	trx, err := l.generator.GenerateTransaction(promptCtx)
 	if err != nil {
-		return "", fmt.Errorf("unable to generate transaction: %v", err)
+		return Transaction{}, fmt.Errorf("unable to generate transaction: %v", err)
 	}
 
-	return trx.toString(), nil
+	return trx, nil
 
+}
+
+func (l *Ledger) ProposeTransaction(userInput string, times int) (tr Transaction,err error) {
+	if times <= 0 {
+		panic("times should be greater than 0")
+	}
+	err = l.repo.Init()
+	defer l.repo.Free()
+
+	if err != nil {
+		return tr, err
+	}
+
+	for ;  times > 0 ; times-- {
+		tr, err = l.proposeTransaction(userInput)
+		if err == nil {
+			return tr, nil
+		}
+	}
+
+	return tr, err
 }
 
 
 type PromptCtx struct {
 	Accounts []string
+	Commodities []string
 	UserInput string
 }
 

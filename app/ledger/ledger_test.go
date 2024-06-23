@@ -3,10 +3,10 @@ package ledger
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mput/teledger/app/repo"
 	"github.com/stretchr/testify/assert"
+	"time"
 )
 
 func TestLedger_Execute(t *testing.T) {
@@ -168,30 +168,63 @@ dummy dummy
 func TestLedger_ProposeTransaction(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 
+		mockCall := 0
+
 		mockedTransactionGenerator := &TransactionGeneratorMock{
-			GenerateTransactionFunc: func(promptCtx PromptCtx) (Transaction, error) {
+			GenerateTransactionFunc: func(p PromptCtx) (mocktr Transaction,err error) {
+				mockCall++
 				dt, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26.371Z")
-				tr := Transaction{
-					Date: dt,
-					Description: "My tr",
-					Postings: []Posting{
-						Posting{
-							Account: "cash",
-							Amount: -30.43,
-							Currency: "EUR",
+				// On the first attempt, return transaction that is not valid
+				// for the test Ledger file
+				if mockCall == 1 {
+					mocktr = Transaction{
+						Date: dt,
+						Description: "My tr",
+						Postings: []Posting{
+							Posting{
+								Account: "cash",
+								Amount: -30.43,
+								Currency: "EUR",
+							},
+							Posting{
+								Account: "taxi",
+								Amount: 30.43,
+								Currency: "EUR",
+							},
 						},
-						Posting{
-							Account: "taxi",
-							Amount: 30.43,
-							Currency: "EUR",
+					}
+				} else {
+					mocktr = Transaction{
+						Date: dt,
+						Comment: p.UserInput,
+						Description: "Tacos",
+						Postings: []Posting{
+							Posting{
+								Account: "Assets:Cash",
+								Amount: -30.43,
+								Currency: "EUR",
+							},
+							Posting{
+								Account: "Food",
+								Amount: 30.43,
+								Currency: "EUR",
+							},
 						},
-					},
+					}
 				}
-				return tr, nil
+				return
+
 			},
 		}
 
 		const testFile = `
+commodity EUR
+commodity USD
+
+account Food
+account Assets:Cash
+account Equity
+
 2024-02-13 * Test
   Assets:Cash  100.00 EUR
   Equity
@@ -201,31 +234,22 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
 			mockedTransactionGenerator,
 			"main.ledger",
-			false,
+			true,
 		)
 
-		tr, err := ledger.ProposeTransaction("20 Taco Bell")
-
+		_, err := ledger.ProposeTransaction("20 Taco Bell", 3)
 
 		assert.NoError(t, err)
 
-		assert.Equal(t,
-			`2014-11-12 My tr
-    cash    -30.43 EUR
-    taxi     30.43 EUR
-`,
-			tr,
-		)
-
 		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 1)
 
-
 		assert.Equal(t,
-			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx,
 			PromptCtx{
-				Accounts:  []string{"Assets:Cards:Wise-EUR", "Assets:Cards:Wise-USD", "Assets:Cards:Wise-RUB"},
+				Accounts:  []string{"Food", "Assets:Cash", "Equity" },
+				Commodities: []string{"EUR", "USD"},
 				UserInput: "20 Taco Bell",
 			},
+			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx,
 		)
 
 
