@@ -166,58 +166,59 @@ dummy dummy
 
 
 func TestLedger_ProposeTransaction(t *testing.T) {
-	t.Run("happy path", func(t *testing.T) {
+	mockCall := 0
 
-		mockCall := 0
+	var mockedTransactionGenerator *TransactionGeneratorMock
 
-		mockedTransactionGenerator := &TransactionGeneratorMock{
-			GenerateTransactionFunc: func(p PromptCtx) (mocktr Transaction,err error) {
-				mockCall++
-				dt, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26.371Z")
-				// On the first attempt, return transaction that is not valid
-				// for the test Ledger file
-				if mockCall == 1 {
-					mocktr = Transaction{
-						Date: dt,
-						Description: "My tr",
-						Postings: []Posting{
-							Posting{
-								Account: "cash",
-								Amount: -30.43,
-								Currency: "EUR",
-							},
-							Posting{
-								Account: "taxi",
-								Amount: 30.43,
-								Currency: "EUR",
-							},
+	mockedTransactionGenerator = &TransactionGeneratorMock{
+		GenerateTransactionFunc: func(p PromptCtx) (mocktr Transaction,err error) {
+			mockCall++
+			dt, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26.371Z")
+			// On the first attempt, return transaction that is not valid
+			// for the test Ledger file
+			if len(mockedTransactionGenerator.calls.GenerateTransaction) == 1 {
+				mocktr = Transaction{
+					Date: dt,
+					Description: "My tr",
+					Comment: "invalid transaction",
+					Postings: []Posting{
+						Posting{
+							Account: "cash",
+							Amount: -30.43,
+							Currency: "EUR",
 						},
-					}
-				} else {
-					mocktr = Transaction{
-						Date: dt,
-						Comment: p.UserInput,
-						Description: "Tacos",
-						Postings: []Posting{
-							Posting{
-								Account: "Assets:Cash",
-								Amount: -30.43,
-								Currency: "EUR",
-							},
-							Posting{
-								Account: "Food",
-								Amount: 30.43,
-								Currency: "EUR",
-							},
+						Posting{
+							Account: "taxi",
+							Amount: 30.43,
+							Currency: "EUR",
 						},
-					}
+					},
 				}
-				return
+			} else {
+				mocktr = Transaction{
+					Date: dt,
+					Comment: "valid transaction",
+					Description: "Tacos",
+					Postings: []Posting{
+						Posting{
+							Account: "Assets:Cash",
+							Amount: -30.43,
+							Currency: "EUR",
+						},
+						Posting{
+							Account: "Food",
+							Amount: 30.43,
+							Currency: "EUR",
+						},
+					},
+				}
+			}
+			return
 
-			},
-		}
+		},
+	}
 
-		const testFile = `
+	const testFile = `
 commodity EUR
 commodity USD
 
@@ -230,18 +231,23 @@ account Equity
   Equity
 `
 
-		ledger := NewLedger(
-			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
-			mockedTransactionGenerator,
-			"main.ledger",
-			true,
-		)
+	ledger := NewLedger(
+		&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
+		mockedTransactionGenerator,
+		"main.ledger",
+		true,
+	)
 
-		_, err := ledger.ProposeTransaction("20 Taco Bell", 3)
+	t.Run("happy path", func(t *testing.T) {
+
+
+		tr, err := ledger.ProposeTransaction("20 Taco Bell", 5)
 
 		assert.NoError(t, err)
 
-		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 1)
+		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 2)
+
+		assert.Equal(t, "valid transaction", tr.Comment)
 
 		assert.Equal(t,
 			PromptCtx{
@@ -252,6 +258,26 @@ account Equity
 			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx,
 		)
 
+		assert.Equal(t,
+			`;; 2014-11-12 11:45:26 Wednesday: valid transaction
+2014-11-12 * Tacos
+    Assets:Cash    -30.43 EUR
+    Food     30.43 EUR
+`,
+			tr.toString(),
+		)
+	})
+
+	t.Run("validation error path", func(t *testing.T) {
+		mockedTransactionGenerator.ResetCalls()
+
+		_, err := ledger.ProposeTransaction("20 Taco Bell", 1)
+
+		assert.ErrorContains(t, err, "Unknown account 'cash'")
+
+		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 1)
 
 	})
+
+
 }

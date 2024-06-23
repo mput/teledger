@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mput/teledger/app/repo"
+	"github.com/mput/teledger/app/utils"
 )
 
 // Ledger is a wrapper around the ledger command line tool
@@ -85,11 +86,15 @@ func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) 
 
 }
 
-func (l *Ledger) execute(args ...string) (string, error) {
+func (l *Ledger) executeWith(additional string, args ...string) (string, error) {
 	r, err := resolveIncludesReader(l.repo, l.mainFile)
 
 	if err != nil {
 		return "", fmt.Errorf("ledger file opening error: %v", err)
+	}
+
+	if additional != "" {
+		r = utils.MultiReadCloser(r, io.NopCloser( strings.NewReader(additional) ))
 	}
 
 	fargs := []string{"-f", "-"}
@@ -132,6 +137,11 @@ func (l *Ledger) execute(args ...string) (string, error) {
 	}
 	return out.String(), nil
 }
+
+func (l *Ledger) execute(args ...string) (string, error) {
+	return l.executeWith("", args...)
+}
+
 
 
 func (l *Ledger) Execute(args ...string) (string, error) {
@@ -176,6 +186,11 @@ func (l *Ledger) AddTransaction(transaction string) error {
 }
 
 func (l *Ledger) validate() error {
+	_, err := l.execute("balance")
+	return err
+}
+
+func (l *Ledger) validateWith(addition string) error {
 	_, err := l.execute("balance")
 	return err
 }
@@ -235,9 +250,12 @@ type Transaction struct {
 	Comment	    string
 }
 
-func (t Transaction) toString() string {
+func (t *Transaction) toString() string {
 	var res strings.Builder
-	res.WriteString(fmt.Sprintf("%s %s\n", t.Date.Format("2006-01-02"), t.Description))
+	if t.Comment != "" {
+		res.WriteString(fmt.Sprintf(";; %s: %s\n",t.Date.Format("2006-01-02 15:04:05 Monday"), t.Comment))
+	}
+	res.WriteString(fmt.Sprintf("%s * %s\n", t.Date.Format("2006-01-02"), t.Description))
 	for _, p := range t.Postings {
 		// format float to 2 decimal places
 		res.WriteString(fmt.Sprintf("    %s  %8.2f %s\n", p.Account, p.Amount, p.Currency))
@@ -376,6 +394,11 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 		return Transaction{}, fmt.Errorf("unable to generate transaction: %v", err)
 	}
 
+	_, err = l.executeWith(trx.toString(), "balance")
+	if err != nil {
+		return Transaction{}, fmt.Errorf("unable to validate transaction: %v", err)
+	}
+
 	return trx, nil
 
 }
@@ -391,7 +414,10 @@ func (l *Ledger) ProposeTransaction(userInput string, times int) (tr Transaction
 		return tr, err
 	}
 
-	for ;  times > 0 ; times-- {
+	for i := 0; i < times; i++ {
+		if i > 0 {
+			slog.Warn("retrying transaction generation", "attempt", i)
+		}
 		tr, err = l.proposeTransaction(userInput)
 		if err == nil {
 			return tr, nil
