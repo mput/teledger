@@ -53,14 +53,17 @@ func (tel *Teledger) Balance() (string, error) {
 }
 
 
-// // Receive a short free-text description of a transaction
-// // and propose a formatted transaction validated with the
-// // ledger file.
-// // Store the transaction in a state, so the user can confirm
-// // or reject it.
-// func (tel *Teledger) proposeTransaction(desc string) (string, error) {
-// 	prompt := fmt.Sprintf("Proposed transaction:\n```\n%s\n```", desc)
-// 	structuredTrx, err := tel.openai.GetStructuredResponse(desc, &transaction{})
-// 	trx := structuredTrx.toString()
+// Receive a short free-text description of a transaction
+// and propose a formatted transaction validated with the
+// ledger file.
+// Store the transaction in a state, so the user can confirm
+// or reject it.
+func (tel *Teledger) ProposeTransaction(desc string) (string, error) {
 
-// }
+	tr, err := tel.ledger.ProposeTransaction(desc, 2)
+	if err != nil {
+		return "", err
+	}
+
+	return tr.ToString(), nil
+}

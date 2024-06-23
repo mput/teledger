@@ -12,6 +12,7 @@ import (
 
 	"github.com/mput/teledger/app/repo"
 	"github.com/mput/teledger/app/utils"
+	_ "embed"
 )
 
 // Ledger is a wrapper around the ledger command line tool
@@ -32,6 +33,11 @@ func NewLedger(rs repo.Service,gen TransactionGenerator , mainFile string, stric
 }
 
 const ledgerBinary = "ledger"
+
+
+//go:embed templates/default_prompt.txt
+var defaultPrompt string
+
 
 func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) {
 	ledgerFile, err := rs.Open(file)
@@ -191,7 +197,7 @@ func (l *Ledger) validate() error {
 }
 
 func (l *Ledger) validateWith(addition string) error {
-	_, err := l.execute("balance")
+	_, err := l.executeWith(addition, "balance")
 	return err
 }
 
@@ -250,7 +256,7 @@ type Transaction struct {
 	Comment	    string
 }
 
-func (t *Transaction) toString() string {
+func (t *Transaction) ToString() string {
 	var res strings.Builder
 	if t.Comment != "" {
 		res.WriteString(fmt.Sprintf(";; %s: %s\n",t.Date.Format("2006-01-02 15:04:05 Monday"), t.Comment))
@@ -279,7 +285,7 @@ type TransactionGenerator interface {
 }
 
 type OpenAITransactionGenerator struct {
-	token string
+	Token string
 }
 
 func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Transaction, error) {
@@ -394,7 +400,7 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 		return Transaction{}, fmt.Errorf("unable to generate transaction: %v", err)
 	}
 
-	_, err = l.executeWith(trx.toString(), "balance")
+	err = l.validateWith(trx.ToString())
 	if err != nil {
 		return Transaction{}, fmt.Errorf("unable to validate transaction: %v", err)
 	}
@@ -403,8 +409,8 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 
 }
 
-func (l *Ledger) ProposeTransaction(userInput string, times int) (tr Transaction,err error) {
-	if times <= 0 {
+func (l *Ledger) ProposeTransaction(userInput string, attempts int) (tr Transaction,err error) {
+	if attempts <= 0 {
 		panic("times should be greater than 0")
 	}
 	err = l.repo.Init()
@@ -414,7 +420,7 @@ func (l *Ledger) ProposeTransaction(userInput string, times int) (tr Transaction
 		return tr, err
 	}
 
-	for i := 0; i < times; i++ {
+	for i := 0; i < attempts; i++ {
 		if i > 0 {
 			slog.Warn("retrying transaction generation", "attempt", i)
 		}
@@ -435,37 +441,3 @@ type PromptCtx struct {
 }
 
 
-const template = `
-Your goal is to propose a transaction in the ledger cli format.
-Your responses MUST be in JSON and adhere to the Transaction struct ONLY with no additional narrative or markup, backquotes or anything.
-
-Bellow is the list of accounts you MUST use in your transaction:
-{{range .Accounts}}
-"{{.}}"
-{{end}}
-
-
-Use "EUR" as the default currency if nothing else is specified in user request.
-Another possible currency is "USD", "RUB".
-All descriptions should be in English.
-
-// Transaction represents a single transaction in a ledger.
-type Transaction struct {
-	Date        time.Time json:"date"         // The date of the transaction
-	Description string    json:"description"  // A description of the transaction
-	Postings    []Posting json:"postings"     // A slice of postings that belong to this transaction
-}
-
-// Posting represents a single posting in a transaction, linking an account with an amount and currency.
-type Posting struct {
-	Account  string  json:"account"  // The name of the account
-	Amount   float64 json:"amount"   // The amount posted to the account
-	Currency string  json:"currency" // The currency of the amount
-}
-
-Use Assets:Cards:Wise-EUR as default account  if nothing else is specified in user request
-
-Bellow is the message from the USER for which you need to propose a transaction:
-
-{{.UserInput}}
-`

@@ -264,7 +264,7 @@ account Equity
     Assets:Cash    -30.43 EUR
     Food     30.43 EUR
 `,
-			tr.toString(),
+			tr.ToString(),
 		)
 	})
 

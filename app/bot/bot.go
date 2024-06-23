@@ -26,6 +26,10 @@ type Opts struct {
 		MainLedgerFile string `long:"main-ledger-file" env:"MAIN_LEDGER_FILE" required:"true" description:"main ledger file path from the repo root"`
 	} `group:"github" namespace:"github" env-namespace:"GITHUB"`
 
+	OpenAI struct {
+		Token string `long:"token" env:"TOKEN" required:"true" description:"openai api token"`
+	} `group:"openai" namespace:"openai" env-namespace:"OPENAI"`
+
 	URL string `long:"url" env:"URL" required:"true" description:"bot url"`
 	Debug bool `long:"debug" env:"DEBUG" description:"debug mode"`
 	Version string
@@ -44,7 +48,11 @@ func NewBot(opts *Opts) (*Bot, error) {
 	}
 
 	rs := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
-	ldgr := ledger.NewLedger(rs, nil, opts.Github.MainLedgerFile, true)
+	llmGenerator := ledger.OpenAITransactionGenerator{
+		Token: opts.OpenAI.Token,
+	}
+
+	ldgr := ledger.NewLedger(rs, llmGenerator, opts.Github.MainLedgerFile, true)
 	tel := teledger.NewTeledger(ldgr)
 
 	return &Bot{
@@ -82,7 +90,7 @@ func (bot *Bot) Start() error {
 	dispatcher.AddHandler(handlers.NewCommand("version", wrapUserResponse(bot.vesrion, "version")))
 	dispatcher.AddHandler(handlers.NewCommand("/", wrapUserResponse(bot.comment, "comment")))
 	dispatcher.AddHandler(handlers.NewCommand("balance", wrapUserResponse(bot.bal, "balance")))
-	dispatcher.AddHandler(handlers.NewMessage(nil, wrapUserResponse(echo, "echo")))
+	dispatcher.AddHandler(handlers.NewMessage(nil, wrapUserResponse(bot.proposeTransaction, "propose-transaction")))
 
 
 
@@ -182,8 +190,14 @@ func (bot *Bot) comment(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, err
 	return fmt.Sprintf("```\n%s\n```", comment), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }
 
-
-func echo(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
+func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	msg := ctx.EffectiveMessage
-	return fmt.Sprintf("Message received! (%s)", msg.Text), nil, nil
+
+	transaction, err := bot.teledger.ProposeTransaction(msg.Text)
+
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err), nil, nil
+	}
+
+	return fmt.Sprintf("```\n%s\n```", transaction), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }
