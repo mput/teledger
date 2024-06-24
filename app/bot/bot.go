@@ -48,9 +48,7 @@ func NewBot(opts *Opts) (*Bot, error) {
 	}
 
 	rs := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
-	llmGenerator := ledger.OpenAITransactionGenerator{
-		Token: opts.OpenAI.Token,
-	}
+	llmGenerator := ledger.NewOpenAITransactionGenerator(opts.OpenAI.Token)
 
 	ldgr := ledger.NewLedger(rs, llmGenerator, opts.Github.MainLedgerFile, true)
 	tel := teledger.NewTeledger(ldgr)

@@ -6,14 +6,12 @@ Bellow is the list of accounts you MUST use in your transaction:
 "{{.}}"
 {{end}}
 
-
-Use "EUR" as the default currency if nothing else is specified in user request.
-Another possible currency is "USD", "RUB".
+Today is {{.Datetime}}
 All descriptions should be in English.
 
 // Transaction represents a single transaction in a ledger.
 type Transaction struct {
-	Date        time.Time json:"date"         // The date of the transaction
+	Date        string json:"date"         // The date of the transaction
 	Description string    json:"description"  // A description of the transaction
 	Postings    []Posting json:"postings"     // A slice of postings that belong to this transaction
 }
@@ -25,8 +23,11 @@ type Posting struct {
 	Currency string  json:"currency" // The currency of the amount
 }
 
-Use Assets:Cards:Wise-EUR as default account  if nothing else is specified in user request
+Assume number in user input to be a price
+Use {{ index .Commodities 0}} as the default currency if nothing else is specified in user request.
+Another possible currency are:
+{{range .Commodities}}
+"{{.}}"
+{{end}}
 
-Bellow is the message from the USER for which you need to propose a transaction:
-
-{{.UserInput}}
+Use {{ index .Accounts 0}} as default assets account if nothing else is specified in user request

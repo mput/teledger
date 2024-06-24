@@ -9,10 +9,16 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"text/template"
 
 	"github.com/mput/teledger/app/repo"
 	"github.com/mput/teledger/app/utils"
+	"github.com/dustin/go-humanize"
+	openai "github.com/sashabaranov/go-openai"
 	_ "embed"
+	"context"
+	"bytes"
+	"encoding/json"
 )
 
 // Ledger is a wrapper around the ledger command line tool
@@ -36,7 +42,7 @@ const ledgerBinary = "ledger"
 
 
 //go:embed templates/default_prompt.txt
-var defaultPrompt string
+var defaultPromtpTemplate string
 
 
 func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) {
@@ -250,21 +256,23 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 
 // Transaction represents a single transaction in a ledger.
 type Transaction struct {
-	Date        time.Time `json:"date"`         // The date of the transaction
+	Date        string    `json:"date"`         // The date of the transaction
 	Description string    `json:"description"`  // A description of the transaction
 	Postings    []Posting `json:"postings"`     // A slice of postings that belong to this transaction
 	Comment	    string
+	RealDateTime time.Time
 }
 
 func (t *Transaction) ToString() string {
 	var res strings.Builder
 	if t.Comment != "" {
-		res.WriteString(fmt.Sprintf(";; %s: %s\n",t.Date.Format("2006-01-02 15:04:05 Monday"), t.Comment))
+		res.WriteString(fmt.Sprintf(";; %s: %s\n",t.RealDateTime.Format("2006-01-02 15:04:05 Monday"), t.Comment))
 	}
-	res.WriteString(fmt.Sprintf("%s * %s\n", t.Date.Format("2006-01-02"), t.Description))
+	res.WriteString(fmt.Sprintf("%s * %s\n", t.RealDateTime.Format("2006-01-02"), t.Description))
 	for _, p := range t.Postings {
 		// format float to 2 decimal places
-		res.WriteString(fmt.Sprintf("    %s  %8.2f %s\n", p.Account, p.Amount, p.Currency))
+		vf := humanize.FormatFloat("#.###,##", p.Amount)
+		res.WriteString(fmt.Sprintf("    %s  %s %s\n",p.Account, vf, p.Currency))
 
 	}
 	return res.String()
@@ -285,11 +293,60 @@ type TransactionGenerator interface {
 }
 
 type OpenAITransactionGenerator struct {
-	Token string
+	openai *openai.Client
+}
+
+func NewOpenAITransactionGenerator(token string) *OpenAITransactionGenerator {
+	return &OpenAITransactionGenerator{
+		openai: openai.NewClient(token),
+	}
 }
 
 func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Transaction, error) {
-	return Transaction{}, nil
+	var buf bytes.Buffer
+	prTmp := template.Must(template.New("letter").Parse(defaultPromtpTemplate))
+	err := prTmp.Execute(&buf, promptCtx)
+	if err != nil {
+		return Transaction{}, fmt.Errorf("unable to execute template: %v", err)
+	}
+
+	prompt := buf.String()
+
+
+	resp, err := b.openai.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: openai.GPT3Dot5Turbo,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: prompt,
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: promptCtx.UserInput,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		fmt.Println("ChatCompletion error: ", err)
+		return Transaction{}, fmt.Errorf("chatCompletion error: %v", err)
+	}
+
+	fmt.Println(resp.Choices[0].Message.Content)
+
+	res := Transaction{}
+	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &res)
+	if err != nil {
+		return Transaction{}, fmt.Errorf("unable to unmarshal response: %v", err)
+	}
+
+	res.Comment = promptCtx.UserInput
+	res.RealDateTime = promptCtx.Datetime
+
+	return res, nil
 }
 
 func parseCommodityOrAccount(ledger io.Reader, directive string) ([]string, error) {
@@ -393,12 +450,15 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 		Accounts: accounts,
 		Commodities: commodities,
 		UserInput: userInput,
+		Datetime: time.Now(),
 	}
 
 	trx, err := l.generator.GenerateTransaction(promptCtx)
 	if err != nil {
 		return Transaction{}, fmt.Errorf("unable to generate transaction: %v", err)
 	}
+
+	fmt.Println(trx.ToString())
 
 	err = l.validateWith(trx.ToString())
 	if err != nil {
@@ -438,6 +498,7 @@ type PromptCtx struct {
 	Accounts []string
 	Commodities []string
 	UserInput string
+	Datetime time.Time
 }
 
 

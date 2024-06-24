@@ -178,36 +178,36 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 			// for the test Ledger file
 			if len(mockedTransactionGenerator.calls.GenerateTransaction) == 1 {
 				mocktr = Transaction{
-					Date: dt,
+					RealDateTime: dt,
 					Description: "My tr",
 					Comment: "invalid transaction",
 					Postings: []Posting{
 						Posting{
 							Account: "cash",
-							Amount: -30.43,
+							Amount: -3000.43,
 							Currency: "EUR",
 						},
 						Posting{
 							Account: "taxi",
-							Amount: 30.43,
+							Amount: 3000.43,
 							Currency: "EUR",
 						},
 					},
 				}
 			} else {
 				mocktr = Transaction{
-					Date: dt,
+					RealDateTime: dt,
 					Comment: "valid transaction",
 					Description: "Tacos",
 					Postings: []Posting{
 						Posting{
 							Account: "Assets:Cash",
-							Amount: -30.43,
+							Amount: -3000.43,
 							Currency: "EUR",
 						},
 						Posting{
 							Account: "Food",
-							Amount: 30.43,
+							Amount: 3000.43,
 							Currency: "EUR",
 						},
 					},
@@ -249,20 +249,33 @@ account Equity
 
 		assert.Equal(t, "valid transaction", tr.Comment)
 
-		assert.Equal(t,
-			PromptCtx{
-				Accounts:  []string{"Food", "Assets:Cash", "Equity" },
-				Commodities: []string{"EUR", "USD"},
-				UserInput: "20 Taco Bell",
-			},
-			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx,
+
+		assert.Equal(
+			t,
+			[]string{"Food", "Assets:Cash", "Equity" },
+			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx.Accounts,
 		)
+
+
+		assert.Equal(
+			t,
+			[]string{"EUR", "USD"},
+			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx.Commodities,
+		)
+
+
+		assert.Equal(
+			t,
+			"20 Taco Bell",
+			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx.UserInput,
+		)
+
 
 		assert.Equal(t,
 			`;; 2014-11-12 11:45:26 Wednesday: valid transaction
 2014-11-12 * Tacos
-    Assets:Cash    -30.43 EUR
-    Food     30.43 EUR
+    Assets:Cash  -3.000,43 EUR
+    Food  3.000,43 EUR
 `,
 			tr.ToString(),
 		)
