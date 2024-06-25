@@ -53,17 +53,38 @@ func (tel *Teledger) Balance() (string, error) {
 }
 
 
+func inBacktick(s string) string {
+	return fmt.Sprintf("```\n%s\n```", s)
+}
+
 // Receive a short free-text description of a transaction
 // and propose a formatted transaction validated with the
 // ledger file.
 // Store the transaction in a state, so the user can confirm
 // or reject it.
 func (tel *Teledger) ProposeTransaction(desc string) (string, error) {
+	wasGenerated, tr, err := tel.ledger.AddOrProposeTransaction(desc, 2)
+	if wasGenerated {
+		if err == nil {
+			return inBacktick(tr.Format(false)), nil
+		} else {
+			if len(tr.Postings) > 0 {
+				return fmt.Sprintf(`Proposed but invalid transaction:
+%s`,
+					inBacktick(tr.Format(false)),
+				), nil
+			} else {
+				return "", err
+			}
 
-	tr, err := tel.ledger.ProposeTransaction(desc, 2)
-	if err != nil {
-		return "", err
+		}
+
+	} else {
+		if err == nil {
+			return "Transaction Added", nil
+		} else {
+			return "", err
+		}
+
 	}
-
-	return tr.Format(true), nil
 }

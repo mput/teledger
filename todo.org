@@ -2,7 +2,7 @@
 
 * Main
 ** [ ] Add Transaction To a ledger repository
-- [ ] Basic (transaction LLM completion and valid transaction addition)
+- [X] Basic (transaction LLM completion and valid transaction addition)
 - [ ] Add to log with chat button
 - [ ] Delete with button
 ** [ ] Configuration from a repository with Ledger

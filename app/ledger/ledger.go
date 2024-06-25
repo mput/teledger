@@ -166,35 +166,44 @@ func (l *Ledger) Execute(args ...string) (string, error) {
 	return l.execute(args...)
 }
 
+func (l *Ledger) addTransaction(transaction string) error {
+	balBefore, err := l.execute("balance")
+	if err != nil {
+		return fmt.Errorf("invalid transaction: %v", err)
+	}
+
+	balAfter, err := l.executeWith(transaction, "balance")
+
+	if err != nil {
+		return fmt.Errorf("invalid transaction: %v", err)
+	}
+
+	if balBefore == balAfter {
+		return fmt.Errorf("invalid transaction: transaction doesn't change balance")
+	}
+
+	r, err := l.repo.OpenForAppend(l.mainFile)
+	if err != nil {
+		return fmt.Errorf("unable to open main ledger file: %v", err)
+	}
+	_, err = fmt.Fprintf(r, "\n%s\n", transaction)
+	defer r.Close()
+	if err != nil {
+		return fmt.Errorf("unable to write main ledger file: %v", err)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (l *Ledger) AddTransaction(transaction string) error {
 	err := l.repo.Init()
 	defer l.repo.Free()
 	if err != nil {
 		return fmt.Errorf("unable to init repo: %v", err)
 	}
-
-
-	balBefore, err := l.execute("balance")
-	if err != nil {
-		return err
-	}
-	r, err := l.repo.OpenForAppend(l.mainFile)
-	if err != nil {
-		return fmt.Errorf("unable to open main ledger file: %v", err)
-	}
-	_, err = fmt.Fprintf(r, "\n%s\n", transaction)
-	r.Close()
-	if err != nil {
-		return fmt.Errorf("unable to write main ledger file: %v", err)
-	}
-	balAfter, err :=l.execute("balance")
-	if err != nil {
-		return err
-	}
-	if balBefore == balAfter {
-		return fmt.Errorf("transaction doesn't change balance")
-	}
-	return nil
+	return l.addTransaction(transaction)
 }
 
 func (l *Ledger) validate() error {
@@ -343,8 +352,6 @@ func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Tr
 		return Transaction{}, fmt.Errorf("chatCompletion error: %v", err)
 	}
 
-	fmt.Println(resp.Choices[0].Message.Content)
-
 	res := Transaction{}
 	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &res)
 	if err != nil {
@@ -466,8 +473,6 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 		return trx, fmt.Errorf("unable to generate transaction: %v", err)
 	}
 
-	fmt.Println(trx.Format(true))
-
 	err = l.validateWith(trx.Format(true))
 	if err != nil {
 		return trx, fmt.Errorf("unable to validate transaction: %v", err)
@@ -477,15 +482,32 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 
 }
 
-func (l *Ledger) ProposeTransaction(userInput string, attempts int) (tr Transaction,err error) {
-	if attempts <= 0 {
-		panic("times should be greater than 0")
-	}
+func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) (wasGenerated bool, tr Transaction,err error) {
+	wasGenerated = false
 	err = l.repo.Init()
 	defer l.repo.Free()
-
 	if err != nil {
-		return tr, err
+		return wasGenerated, tr, err
+	}
+
+	// first try to add userInput as transaction
+	err = l.addTransaction(userInput)
+	if err == nil {
+		err = l.repo.CommitPush("New comment", "teledger", "teledger@example.com")
+		if err != nil {
+			return wasGenerated, tr, err
+		}
+		return wasGenerated, tr, nil
+	}
+
+	if !strings.HasPrefix(err.Error(), "invalid transaction:") {
+		return wasGenerated, tr, err
+	}
+
+	// after this generate a transaction using LLM
+	wasGenerated = true
+	if attempts <= 0 {
+		panic("times should be greater than 0")
 	}
 
 	for i := 0; i < attempts; i++ {
@@ -494,11 +516,11 @@ func (l *Ledger) ProposeTransaction(userInput string, attempts int) (tr Transact
 		}
 		tr, err = l.proposeTransaction(userInput)
 		if err == nil {
-			return tr, nil
+			return wasGenerated, tr, nil
 		}
 	}
 
-	return tr, err
+	return wasGenerated, tr, err
 }
 
 

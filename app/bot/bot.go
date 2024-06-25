@@ -197,5 +197,5 @@ func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessa
 		return fmt.Sprintf("Error: %v", err), nil, nil
 	}
 
-	return fmt.Sprintf("```\n%s\n```", transaction), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
+	return transaction, &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }

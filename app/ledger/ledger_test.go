@@ -241,7 +241,9 @@ account Equity
 	t.Run("happy path", func(t *testing.T) {
 
 
-		tr, err := ledger.ProposeTransaction("20 Taco Bell", 5)
+		wasGenerated, tr, err := ledger.AddOrProposeTransaction("20 Taco Bell", 5)
+
+		assert.True(t, wasGenerated)
 
 		assert.NoError(t, err)
 
@@ -282,10 +284,25 @@ account Equity
 		)
 	})
 
+	t.Run("add an already valid transaction", func(t *testing.T) {
+		mockedTransactionGenerator.ResetCalls()
+
+		wasGenerated, _, err := ledger.AddOrProposeTransaction(`
+2014-11-12 * Tacos
+    Assets:Cash  -2,43 EUR
+    Food  2,43 EUR
+`, 1)
+
+		assert.False(t, wasGenerated)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(mockedTransactionGenerator.calls.GenerateTransaction))
+
+	})
+
 	t.Run("validation error path", func(t *testing.T) {
 		mockedTransactionGenerator.ResetCalls()
 
-		_, err := ledger.ProposeTransaction("20 Taco Bell", 1)
+		_, _, err := ledger.AddOrProposeTransaction("20 Taco Bell", 1)
 
 		assert.ErrorContains(t, err, "Unknown account 'cash'")
 
