@@ -65,5 +65,5 @@ func (tel *Teledger) ProposeTransaction(desc string) (string, error) {
 		return "", err
 	}
 
-	return tr.ToString(), nil
+	return tr.Format(true), nil
 }

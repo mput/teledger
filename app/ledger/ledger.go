@@ -207,6 +207,18 @@ func (l *Ledger) validateWith(addition string) error {
 	return err
 }
 
+func wrapIntoComment(s string) string {
+	lines := make([]string, 0)
+
+	for _, l := range strings.Split(s, "\n") {
+		if l != "" {
+			lines = append(lines, fmt.Sprintf(";; %s", l))
+		}
+	}
+
+	res := strings.Join(lines, "\n")
+	return res
+}
 
 func (l *Ledger) AddComment(comment string) (string, error) {
 	err := l.repo.Init()
@@ -220,19 +232,12 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 		return "", fmt.Errorf("unable to open main ledger file: %v", err)
 	}
 
-	lines := make([]string, 0)
+	res := wrapIntoComment(comment)
 
-	for _, l := range strings.Split(comment, "\n") {
-		if l != "" {
-			lines = append(lines, fmt.Sprintf(";; %s", l))
-		}
-	}
-
-	if len(lines) == 1 {
+	if res == "" {
 		return "", fmt.Errorf("empty comment provided")
 	}
 
-	res := strings.Join(lines, "\n")
 
 	_, err = fmt.Fprintf(r, "\n%s\n", res)
 
@@ -246,7 +251,7 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 		return "", fmt.Errorf("ledger file become invalid after an attempt to add comment: %v", err)
 	}
 
-	err = l.repo.CommitPush(fmt.Sprintf("comment: %s", lines[0]), "teledger", "teledger@example.com")
+	err = l.repo.CommitPush("New comment", "teledger", "teledger@example.com")
 	if err != nil {
 		return "", fmt.Errorf("unable to commit: %v", err)
 
@@ -263,10 +268,13 @@ type Transaction struct {
 	RealDateTime time.Time
 }
 
-func (t *Transaction) ToString() string {
+func (t *Transaction) Format(withComment bool) string {
 	var res strings.Builder
-	if t.Comment != "" {
-		res.WriteString(fmt.Sprintf(";; %s: %s\n",t.RealDateTime.Format("2006-01-02 15:04:05 Monday"), t.Comment))
+	if withComment {
+		res.WriteString(
+			wrapIntoComment(fmt.Sprintf("%s: %s",t.RealDateTime.Format("2006-01-02 15:04:05 Monday"), t.Comment)),
+		)
+		res.WriteString("\n")
 	}
 	res.WriteString(fmt.Sprintf("%s * %s\n", t.RealDateTime.Format("2006-01-02"), t.Description))
 	for _, p := range t.Postings {
@@ -455,14 +463,14 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 
 	trx, err := l.generator.GenerateTransaction(promptCtx)
 	if err != nil {
-		return Transaction{}, fmt.Errorf("unable to generate transaction: %v", err)
+		return trx, fmt.Errorf("unable to generate transaction: %v", err)
 	}
 
-	fmt.Println(trx.ToString())
+	fmt.Println(trx.Format(true))
 
-	err = l.validateWith(trx.ToString())
+	err = l.validateWith(trx.Format(true))
 	if err != nil {
-		return Transaction{}, fmt.Errorf("unable to validate transaction: %v", err)
+		return trx, fmt.Errorf("unable to validate transaction: %v", err)
 	}
 
 	return trx, nil

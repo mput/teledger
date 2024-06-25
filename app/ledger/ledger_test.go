@@ -197,7 +197,7 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 			} else {
 				mocktr = Transaction{
 					RealDateTime: dt,
-					Comment: "valid transaction",
+					Comment: "valid transaction\n22 multiple lines",
 					Description: "Tacos",
 					Postings: []Posting{
 						Posting{
@@ -247,7 +247,7 @@ account Equity
 
 		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 2)
 
-		assert.Equal(t, "valid transaction", tr.Comment)
+		assert.Equal(t, "valid transaction\n22 multiple lines", tr.Comment)
 
 
 		assert.Equal(
@@ -273,11 +273,12 @@ account Equity
 
 		assert.Equal(t,
 			`;; 2014-11-12 11:45:26 Wednesday: valid transaction
+;; 22 multiple lines
 2014-11-12 * Tacos
     Assets:Cash  -3.000,43 EUR
     Food  3.000,43 EUR
 `,
-			tr.ToString(),
+			tr.Format(true),
 		)
 	})
 
