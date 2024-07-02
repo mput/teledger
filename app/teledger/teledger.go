@@ -67,24 +67,23 @@ func (tel *Teledger) ProposeTransaction(desc string) (string, error) {
 	if wasGenerated {
 		if err == nil {
 			return inBacktick(tr.Format(false)), nil
-		} else {
-			if len(tr.Postings) > 0 {
-				return fmt.Sprintf(`Proposed but invalid transaction:
+		}
+
+		if len(tr.Postings) == 0 {
+			return fmt.Sprintf(`Proposed but invalid transaction:
 %s`,
-					inBacktick(tr.Format(false)),
-				), nil
-			} else {
-				return "", err
-			}
-
+				inBacktick(tr.Format(false)),
+			), nil
 		}
 
-	} else {
-		if err == nil {
-			return "Transaction Added", nil
-		} else {
-			return "", err
-		}
+		return "", err
 
 	}
+
+	if err == nil {
+		return "Transaction Added", nil
+	}
+	return "", err
+
+
 }
