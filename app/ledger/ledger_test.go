@@ -7,6 +7,8 @@ import (
 	"github.com/mput/teledger/app/repo"
 	"github.com/stretchr/testify/assert"
 	"time"
+	"github.com/joho/godotenv"
+	"os"
 )
 
 func TestLedger_Execute(t *testing.T) {
@@ -20,12 +22,7 @@ func TestLedger_Execute(t *testing.T) {
   Equity
 `
 
-		ledger := NewLedger(
-			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
-			nil,
-			"main.ledger",
-			false,
-		)
+		ledger := NewLedger(&repo.Mock{Files: map[string]string{"main.ledger": testFile}}, nil)
 
 		res, err := ledger.Execute("bal")
 
@@ -70,7 +67,7 @@ commodity EUR
 			Files: files,
 		}
 
-		ledger := NewLedger(repomock, nil, "main.ledger", true)
+		ledger := NewLedger(repomock, nil)
 
 		res, err := ledger.Execute("bal")
 
@@ -102,12 +99,7 @@ func TestLedger_AddTransaction(t *testing.T) {
   Equity
 `
 
-		ledger := NewLedger(
-			&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
-			nil,
-			"main.ledger",
-			false,
-		)
+		ledger := NewLedger(&repo.Mock{Files: map[string]string{"main.ledger": testFile}}, nil)
 
 		err := ledger.AddTransaction(`
 2024-02-14 * Test
@@ -230,18 +222,25 @@ account Equity
   Assets:Cash  100.00 EUR
   Equity
 `
+	const configYaml = `
+strict: true
+`
 
+	// strict mode
 	ledger := NewLedger(
-		&repo.Mock{Files: map[string]string{"main.ledger": testFile}},
+		&repo.Mock{Files: map[string]string{
+			"main.ledger": testFile,
+			"teledger.yaml": configYaml,
+		}},
 		mockedTransactionGenerator,
-		"main.ledger",
-		true,
 	)
 
 	t.Run("happy path", func(t *testing.T) {
 
 
 		wasGenerated, tr, err := ledger.AddOrProposeTransaction("20 Taco Bell", 5)
+
+		assert.True(t, ledger.Config.StrictMode)
 
 		assert.True(t, wasGenerated)
 
@@ -309,6 +308,35 @@ account Equity
 		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 1)
 
 	})
+
+
+}
+
+
+func TestWithRepo(t *testing.T) {
+	_ = godotenv.Load("../../.env.dev")
+
+	gitURL := os.Getenv("GITHUB_URL")
+	if gitURL == "" {
+		t.Fatal("GIT_URL is not set")
+	}
+
+	gitToken := os.Getenv("GITHUB_TOKEN")
+	if gitToken == "" {
+		t.Fatal("GIT_ACCESS_TOKEN is not set")
+	}
+
+	inmemrepo := repo.NewInMemoryRepo(gitURL, gitToken)
+
+	ledger := NewLedger(inmemrepo, nil)
+
+	res, err := ledger.Execute("bal")
+
+	assert.NoError(t, err)
+
+	assert.True(t, ledger.Config.StrictMode)
+
+	assert.NotEmpty(t, res)
 
 
 }

@@ -1,11 +1,11 @@
 package teledger
 
 import (
-	"github.com/mput/teledger/app/ledger"
-	"time"
 	"fmt"
-)
+	"time"
 
+	"github.com/mput/teledger/app/ledger"
+)
 
 // Teledger is the service that handles all the
 // operations related to the Ledger files

@@ -35,7 +35,7 @@ func (r *Mock) Open(file string) (io.ReadCloser, error) {
 	if content, ok := r.files[file]; ok {
 		return io.NopCloser(strings.NewReader(content)), nil
 	}
-	return nil, fmt.Errorf("file not found")
+	return nil, os.ErrNotExist
 }
 
 func (r *Mock) OpenFile(_ string, _ int, _ os.FileMode) (io.ReadWriteCloser, error) {
@@ -52,7 +52,7 @@ func (r *Mock) OpenForAppend(file string) (io.WriteCloser, error) {
 	if content, ok := r.files[file]; ok {
 		return &WriteCloserT{r: r, f: file, dt: []byte(content)}, nil
 	}
-	return nil, fmt.Errorf("file not found")
+	return nil, os.ErrNotExist
 }
 
 type WriteCloserT struct {

@@ -8,42 +8,54 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 	"text/template"
+	"time"
 
+	"bytes"
+	"context"
+	_ "embed"
+	"encoding/json"
+
+	"github.com/dustin/go-humanize"
 	"github.com/mput/teledger/app/repo"
 	"github.com/mput/teledger/app/utils"
-	"github.com/dustin/go-humanize"
 	openai "github.com/sashabaranov/go-openai"
-	_ "embed"
-	"context"
-	"bytes"
-	"encoding/json"
+	"gopkg.in/yaml.v3"
 )
 
 // Ledger is a wrapper around the ledger command line tool
 type Ledger struct {
 	repo repo.Service
-	mainFile string
-	strict bool
+	// mainFile string
+	// strict    bool
 	generator TransactionGenerator
+	Config    *Config
 }
 
-func NewLedger(rs repo.Service,gen TransactionGenerator , mainFile string, strict bool) *Ledger {
+type Report struct {
+	Title   string
+	Command []string
+}
+
+type Config struct {
+	Reports        []Report `yaml:"reports"`
+	MainFile       string `yaml:"mainFile"`
+	PromptTemplate string `yaml:"promptTemplate"`
+	StrictMode     bool `yaml:"strict"`
+	Version        string `yaml:"version"`
+}
+
+func NewLedger(rs repo.Service, gen TransactionGenerator) *Ledger {
 	return &Ledger{
-		repo: rs,
+		repo:      rs,
 		generator: gen,
-		mainFile: mainFile,
-		strict: strict,
 	}
 }
 
 const ledgerBinary = "ledger"
 
-
 //go:embed templates/default_prompt.txt
 var defaultPromtpTemplate string
-
 
 func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) {
 	ledgerFile, err := rs.Open(file)
@@ -99,27 +111,27 @@ func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) 
 }
 
 func (l *Ledger) executeWith(additional string, args ...string) (string, error) {
-	r, err := resolveIncludesReader(l.repo, l.mainFile)
+	r, err := resolveIncludesReader(l.repo, l.Config.MainFile)
 
 	if err != nil {
 		return "", fmt.Errorf("ledger file opening error: %v", err)
 	}
 
 	if additional != "" {
-		r = utils.MultiReadCloser(r, io.NopCloser( strings.NewReader(additional) ))
+		r = utils.MultiReadCloser(r, io.NopCloser(strings.NewReader(additional)))
 	}
 
 	fargs := []string{"-f", "-"}
-	if l.strict {
+	if l.Config.StrictMode {
 		fargs = append(fargs, "--pedantic")
 	}
 	fargs = append(fargs, args...)
 
-    cmddir, err := os.MkdirTemp("", "ledger")
+	cmddir, err := os.MkdirTemp("", "ledger")
 	if err != nil {
 		return "", fmt.Errorf("ledger temp dir creation error: %v", err)
 	}
-    defer os.RemoveAll(cmddir)
+	defer os.RemoveAll(cmddir)
 
 	cmd := exec.Command(ledgerBinary, fargs...)
 
@@ -154,13 +166,15 @@ func (l *Ledger) execute(args ...string) (string, error) {
 	return l.executeWith("", args...)
 }
 
-
-
 func (l *Ledger) Execute(args ...string) (string, error) {
 	err := l.repo.Init()
 	defer l.repo.Free()
 	if err != nil {
 		return "", fmt.Errorf("unable to init repo: %v", err)
+	}
+	err = l.setConfig()
+	if err != nil {
+		return "", fmt.Errorf("unable to set config: %v", err)
 	}
 
 	return l.execute(args...)
@@ -182,7 +196,7 @@ func (l *Ledger) addTransaction(transaction string) error {
 		return fmt.Errorf("invalid transaction: transaction doesn't change balance")
 	}
 
-	r, err := l.repo.OpenForAppend(l.mainFile)
+	r, err := l.repo.OpenForAppend(l.Config.MainFile)
 	if err != nil {
 		return fmt.Errorf("unable to open main ledger file: %v", err)
 	}
@@ -203,6 +217,11 @@ func (l *Ledger) AddTransaction(transaction string) error {
 	if err != nil {
 		return fmt.Errorf("unable to init repo: %v", err)
 	}
+	err = l.setConfig()
+	if err != nil {
+		return fmt.Errorf("unable to set config: %v", err)
+	}
+
 	return l.addTransaction(transaction)
 }
 
@@ -235,8 +254,12 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to init repo: %v", err)
 	}
+	err = l.setConfig()
+	if err != nil {
+		return "", fmt.Errorf("unable to set config: %v", err)
+	}
 
-	r, err := l.repo.OpenForAppend(l.mainFile)
+	r, err := l.repo.OpenForAppend(l.Config.MainFile)
 	if err != nil {
 		return "", fmt.Errorf("unable to open main ledger file: %v", err)
 	}
@@ -246,7 +269,6 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 	if res == "" {
 		return "", fmt.Errorf("empty comment provided")
 	}
-
 
 	_, err = fmt.Fprintf(r, "\n%s\n", res)
 
@@ -270,10 +292,10 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 
 // Transaction represents a single transaction in a ledger.
 type Transaction struct {
-	Date        string    `json:"date"`         // The date of the transaction
-	Description string    `json:"description"`  // A description of the transaction
-	Postings    []Posting `json:"postings"`     // A slice of postings that belong to this transaction
-	Comment	    string
+	Date         string    `json:"date"`        // The date of the transaction
+	Description  string    `json:"description"` // A description of the transaction
+	Postings     []Posting `json:"postings"`    // A slice of postings that belong to this transaction
+	Comment      string
 	RealDateTime time.Time
 }
 
@@ -281,7 +303,7 @@ func (t *Transaction) Format(withComment bool) string {
 	var res strings.Builder
 	if withComment {
 		res.WriteString(
-			wrapIntoComment(fmt.Sprintf("%s: %s",t.RealDateTime.Format("2006-01-02 15:04:05 Monday"), t.Comment)),
+			wrapIntoComment(fmt.Sprintf("%s: %s", t.RealDateTime.Format("2006-01-02 15:04:05 Monday"), t.Comment)),
 		)
 		res.WriteString("\n")
 	}
@@ -289,7 +311,7 @@ func (t *Transaction) Format(withComment bool) string {
 	for _, p := range t.Postings {
 		// format float to 2 decimal places
 		vf := humanize.FormatFloat("#.###,##", p.Amount)
-		res.WriteString(fmt.Sprintf("    %s  %s %s\n",p.Account, vf, p.Currency))
+		res.WriteString(fmt.Sprintf("    %s  %s %s\n", p.Account, vf, p.Currency))
 
 	}
 	return res.String()
@@ -304,6 +326,7 @@ type Posting struct {
 
 // TransactionGenerator is an interface for generating transactions from user input
 // using LLM.
+//
 //go:generate moq -out  transaction_generator_mock.go -with-resets . TransactionGenerator
 type TransactionGenerator interface {
 	GenerateTransaction(promptCtx PromptCtx) (Transaction, error)
@@ -328,7 +351,6 @@ func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Tr
 	}
 
 	prompt := buf.String()
-
 
 	resp, err := b.openai.CreateChatCompletion(
 		context.Background(),
@@ -384,7 +406,7 @@ func parseCommodityOrAccount(ledger io.Reader, directive string) ([]string, erro
 }
 
 func (l *Ledger) extractAccounts() ([]string, error) {
-	r, err := resolveIncludesReader(l.repo, l.mainFile)
+	r, err := resolveIncludesReader(l.repo, l.Config.MainFile)
 	if err != nil {
 		return nil, err
 	}
@@ -394,13 +416,11 @@ func (l *Ledger) extractAccounts() ([]string, error) {
 		return nil, fmt.Errorf("unable to extract accounts from directives: %v", err)
 	}
 
-
 	accsFromTrxsS, err := l.execute("accounts")
 	if err != nil {
 		return nil, fmt.Errorf("unable to extract accounts from transactions: %v", err)
 	}
 	accsFromTrxs := strings.Split(strings.TrimSpace(accsFromTrxsS), "\n")
-
 
 	accs = append(accs, accsFromTrxs...)
 	accsdedup := make([]string, 0)
@@ -415,7 +435,7 @@ func (l *Ledger) extractAccounts() ([]string, error) {
 }
 
 func (l *Ledger) extractCommodities() ([]string, error) {
-	r, err := resolveIncludesReader(l.repo, l.mainFile)
+	r, err := resolveIncludesReader(l.repo, l.Config.MainFile)
 	if err != nil {
 		return nil, err
 	}
@@ -425,13 +445,11 @@ func (l *Ledger) extractCommodities() ([]string, error) {
 		return nil, fmt.Errorf("unable to extract accounts from directives: %v", err)
 	}
 
-
 	comsFromTrxsS, err := l.execute("commodities")
 	if err != nil {
 		return nil, fmt.Errorf("unable to extract accounts from transactions: %v", err)
 	}
 	comsFromTrxs := strings.Split(strings.TrimSpace(comsFromTrxsS), "\n")
-
 
 	coms = append(coms, comsFromTrxs...)
 	dedup := make([]string, 0)
@@ -444,7 +462,6 @@ func (l *Ledger) extractCommodities() ([]string, error) {
 	}
 	return dedup, nil
 }
-
 
 // Receive a short free-text description of a transaction
 // and returns a formatted transaction validated with the
@@ -460,12 +477,11 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 		return Transaction{}, err
 	}
 
-
 	promptCtx := PromptCtx{
-		Accounts: accounts,
+		Accounts:    accounts,
 		Commodities: commodities,
-		UserInput: userInput,
-		Datetime: time.Now(),
+		UserInput:   userInput,
+		Datetime:    time.Now(),
 	}
 
 	trx, err := l.generator.GenerateTransaction(promptCtx)
@@ -482,12 +498,58 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 
 }
 
-func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) (wasGenerated bool, tr Transaction,err error) {
+func parseConfig(r io.Reader, c *Config) error {
+	err := yaml.NewDecoder(r).Decode(c)
+	if err != nil {
+		slog.Warn("error decoding config file", "error", err)
+		return err
+	}
+	return nil
+}
+
+
+func (l *Ledger) setConfig() error {
+	if l.Config == nil {
+		l.Config = &Config{}
+	}
+	const configFile = "teledger.yaml"
+	r, err := l.repo.Open(configFile)
+	if err == nil {
+		err = parseConfig(r, l.Config)
+		if err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		fmt.Println("unable to open config file", "error", err)
+		return err
+	}
+	// set defaults:
+	if l.Config.MainFile == "" {
+		l.Config.MainFile = "main.ledger"
+	}
+
+	if l.Config.PromptTemplate == "" {
+		l.Config.PromptTemplate = defaultPromtpTemplate
+	}
+
+	if l.Config.Version == "" {
+		l.Config.Version = "0"
+	}
+
+	return nil
+}
+
+
+func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) (wasGenerated bool, tr Transaction, err error) {
 	wasGenerated = false
 	err = l.repo.Init()
 	defer l.repo.Free()
 	if err != nil {
 		return wasGenerated, tr, err
+	}
+	err = l.setConfig()
+	if err != nil {
+		return wasGenerated, tr, fmt.Errorf("unable to set config: %v", err)
 	}
 
 	// first try to add userInput as transaction
@@ -523,12 +585,9 @@ func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) (wasGen
 	return wasGenerated, tr, err
 }
 
-
 type PromptCtx struct {
-	Accounts []string
+	Accounts    []string
 	Commodities []string
-	UserInput string
-	Datetime time.Time
+	UserInput   string
+	Datetime    time.Time
 }
-
-

@@ -23,7 +23,6 @@ type Opts struct {
 	Github struct {
 		URL string `long:"url" env:"URL" required:"true" description:"github repo url"`
 		Token string `long:"token" env:"TOKEN" required:"true" description:"fine-grained personal access tokens for repo with RW Contents scope"`
-		MainLedgerFile string `long:"main-ledger-file" env:"MAIN_LEDGER_FILE" required:"true" description:"main ledger file path from the repo root"`
 	} `group:"github" namespace:"github" env-namespace:"GITHUB"`
 
 	OpenAI struct {
@@ -50,7 +49,7 @@ func NewBot(opts *Opts) (*Bot, error) {
 	rs := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
 	llmGenerator := ledger.NewOpenAITransactionGenerator(opts.OpenAI.Token)
 
-	ldgr := ledger.NewLedger(rs, llmGenerator, opts.Github.MainLedgerFile, true)
+	ldgr := ledger.NewLedger(rs, llmGenerator)
 	tel := teledger.NewTeledger(ldgr)
 
 	return &Bot{

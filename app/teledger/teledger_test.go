@@ -23,12 +23,7 @@ func TestTeledger_AddComment(t *testing.T) {
 			Files: map[string]string{"main.ledger": initContent},
 		}
 
-		l := ledger.NewLedger(
-			r,
-			nil,
-			"main.ledger",
-			false,
-		)
+		l := ledger.NewLedger(r, nil)
 
 		tldgr := &Teledger{
 			ledger: l,
