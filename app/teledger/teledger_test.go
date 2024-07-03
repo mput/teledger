@@ -26,7 +26,7 @@ func TestTeledger_AddComment(t *testing.T) {
 		l := ledger.NewLedger(r, nil)
 
 		tldgr := &Teledger{
-			ledger: l,
+			Ledger: l,
 		}
 
 		_, err := tldgr.AddComment("This is a comment\n multiline")

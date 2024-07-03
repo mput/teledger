@@ -10,13 +10,13 @@ import (
 // Teledger is the service that handles all the
 // operations related to the Ledger files
 type Teledger struct {
-	ledger *ledger.Ledger
+	Ledger *ledger.Ledger
 }
 
 
 func NewTeledger(ldgr *ledger.Ledger) *Teledger {
 	return &Teledger{
-		ledger: ldgr,
+		Ledger: ldgr,
 	}
 }
 
@@ -41,7 +41,7 @@ func (tel *Teledger) AddComment(comment string) (string, error) {
 		now.Format("2006-01-02"),
 	)
 
-	res, err := tel.ledger.AddComment(commitLine)
+	res, err := tel.Ledger.AddComment(commitLine)
 	if err != nil {
 		return "", err
 	}
@@ -49,7 +49,27 @@ func (tel *Teledger) AddComment(comment string) (string, error) {
 }
 
 func (tel *Teledger) Balance() (string, error) {
-	return tel.ledger.Execute("bal")
+	return tel.Ledger.Execute("bal")
+}
+
+func (tel *Teledger) Report(reportTitle string) (string, error) {
+	var reportArgs []string
+	for _, report := range tel.Ledger.Config.Reports {
+		if report.Title == reportTitle {
+			reportArgs = report.Command
+			break
+		}
+	}
+	if len(reportArgs) == 0 {
+		return "", fmt.Errorf("Report not found")
+	}
+	return tel.Ledger.Execute(reportArgs...)
+}
+
+
+func (tel *Teledger) Init() error {
+	_, err := tel.Ledger.Execute("bal")
+	return  err
 }
 
 
@@ -63,7 +83,7 @@ func inBacktick(s string) string {
 // Store the transaction in a state, so the user can confirm
 // or reject it.
 func (tel *Teledger) ProposeTransaction(desc string) (string, error) {
-	wasGenerated, tr, err := tel.ledger.AddOrProposeTransaction(desc, 2)
+	wasGenerated, tr, err := tel.Ledger.AddOrProposeTransaction(desc, 2)
 	if wasGenerated {
 		if err == nil {
 			return inBacktick(tr.Format(false)), nil

@@ -52,6 +52,11 @@ func NewBot(opts *Opts) (*Bot, error) {
 	ldgr := ledger.NewLedger(rs, llmGenerator)
 	tel := teledger.NewTeledger(ldgr)
 
+	err = tel.Init()
+	if err != nil {
+		return nil, fmt.Errorf("unable to init teledger: %v", err)
+	}
+
 	return &Bot{
 		opts: opts,
 		teledger: tel,
@@ -62,6 +67,7 @@ func NewBot(opts *Opts) (*Bot, error) {
 
 func (bot *Bot) Start() error {
 	defaultCommands := []gotgbot.BotCommand{
+		{Command: "reports", Description: "Show available reports"},
 		{Command: "balance", Description: "Show balance"},
 		{Command: "version", Description: "Show version"},
 	}
@@ -83,12 +89,20 @@ func (bot *Bot) Start() error {
 	updater := ext.NewUpdater(dispatcher, nil)
 
 
+
+
+
+	dispatcher.AddHandler(handlers.NewCommand("reports", wrapUserResponse(bot.showAvailableReports, "reports")))
+	dispatcher.AddHandler(handlers.NewCallback(isReportCallback, wrapUserResponse(bot.showReport, "show-report")))
+
+
 	dispatcher.AddHandler(handlers.NewCommand("start", wrapUserResponse(start, "start")))
 	dispatcher.AddHandler(handlers.NewCommand("version", wrapUserResponse(bot.vesrion, "version")))
-	dispatcher.AddHandler(handlers.NewCommand("/", wrapUserResponse(bot.comment, "comment")))
 	dispatcher.AddHandler(handlers.NewCommand("balance", wrapUserResponse(bot.bal, "balance")))
-	dispatcher.AddHandler(handlers.NewMessage(nil, wrapUserResponse(bot.proposeTransaction, "propose-transaction")))
 
+	// these handlers should be at the end, as they are less specific
+	dispatcher.AddHandler(handlers.NewCommand("/", wrapUserResponse(bot.comment, "comment")))
+	dispatcher.AddHandler(handlers.NewMessage(nil, wrapUserResponse(bot.proposeTransaction, "propose-transaction")))
 
 
 	// Start receiving updates.
@@ -197,4 +211,56 @@ func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessa
 	}
 
 	return transaction, &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
+}
+
+
+func (bot *Bot) showAvailableReports(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
+	reports := bot.teledger.Ledger.Config.Reports
+
+	inlineKeyboard := [][]gotgbot.InlineKeyboardButton{}
+
+	for _, report := range reports {
+		inlineKeyboard = append(inlineKeyboard, []gotgbot.InlineKeyboardButton{
+			{
+				Text: report.Title,
+				CallbackData: fmt.Sprintf("report:%s", report.Title),
+			},
+		})
+	}
+
+	opts := &gotgbot.SendMessageOpts{
+		ParseMode: "MarkdownV2",
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{
+			InlineKeyboard: inlineKeyboard,
+		},
+
+	}
+
+	return "Available reports:", opts, nil
+}
+
+func isReportCallback(cq *gotgbot.CallbackQuery) bool {
+	return true
+}
+
+func (bot *Bot) showReport(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
+	cq := ctx.CallbackQuery
+	_, err := bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
+		Text: "✔️",
+	})
+
+	if err != nil {
+		slog.Error("unable to answer callback query", "error", err)
+	}
+
+
+	reportTitle := strings.TrimPrefix(cq.Data, "report:")
+	report, err := bot.teledger.Report(reportTitle)
+
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err), nil, nil
+	}
+
+
+	return fmt.Sprintf("```\n%s\n```", report), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }
