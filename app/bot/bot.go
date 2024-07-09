@@ -29,8 +29,7 @@ type Opts struct {
 		Token string `long:"token" env:"TOKEN" required:"true" description:"openai api token"`
 	} `group:"openai" namespace:"openai" env-namespace:"OPENAI"`
 
-	URL string `long:"url" env:"URL" required:"true" description:"bot url"`
-	Debug bool `long:"debug" env:"DEBUG" description:"debug mode"`
+	// URL string `long:"url" env:"URL" required:"true" description:"bot url"`
 	Version string
 }
 
@@ -214,7 +213,7 @@ func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessa
 }
 
 
-func (bot *Bot) showAvailableReports(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
+func (bot *Bot) showAvailableReports(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	reports := bot.teledger.Ledger.Config.Reports
 
 	inlineKeyboard := [][]gotgbot.InlineKeyboardButton{}
@@ -239,7 +238,7 @@ func (bot *Bot) showAvailableReports(ctx *ext.Context) (string, *gotgbot.SendMes
 	return "Available reports:", opts, nil
 }
 
-func isReportCallback(cq *gotgbot.CallbackQuery) bool {
+func isReportCallback(_ *gotgbot.CallbackQuery) bool {
 	return true
 }
 

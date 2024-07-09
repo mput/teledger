@@ -3,10 +3,13 @@
 * Main
 ** [ ] Add Transaction To a ledger repository
 - [X] Basic (transaction LLM completion and valid transaction addition)
-- [ ] Add to log with chat button
-- [ ] Delete with button
+- [ ] Add transaction to log with chat callback button
+- [ ] Add button to delete transaction
 ** [ ] Configuration from a repository with Ledger
+- [ ] Strict mode
+- [ ] Main file
+- [ ] Add transactions immediately without confirmation
 - [ ] Prompt Templates
-** [ ] Text Reports (from configuration)
+** [x] Text Reports (from configuration)
 * Nice to Have
 ** [ ] Visual Reports

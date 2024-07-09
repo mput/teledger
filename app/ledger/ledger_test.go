@@ -163,7 +163,7 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 	var mockedTransactionGenerator *TransactionGeneratorMock
 
 	mockedTransactionGenerator = &TransactionGeneratorMock{
-		GenerateTransactionFunc: func(p PromptCtx) (mocktr Transaction,err error) {
+		GenerateTransactionFunc: func(_ PromptCtx) (mocktr Transaction,err error) {
 			mockCall++
 			dt, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26.371Z")
 			// On the first attempt, return transaction that is not valid
@@ -174,12 +174,12 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 					Description: "My tr",
 					Comment: "invalid transaction",
 					Postings: []Posting{
-						Posting{
+						{
 							Account: "cash",
 							Amount: -3000.43,
 							Currency: "EUR",
 						},
-						Posting{
+						{
 							Account: "taxi",
 							Amount: 3000.43,
 							Currency: "EUR",
@@ -192,12 +192,12 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 					Comment: "valid transaction\n22 multiple lines",
 					Description: "Tacos",
 					Postings: []Posting{
-						Posting{
+						{
 							Account: "Assets:Cash",
 							Amount: -3000.43,
 							Currency: "EUR",
 						},
-						Posting{
+						{
 							Account: "Food",
 							Amount: 3000.43,
 							Currency: "EUR",
@@ -205,8 +205,7 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 					},
 				}
 			}
-			return
-
+			return mocktr, nil
 		},
 	}
 

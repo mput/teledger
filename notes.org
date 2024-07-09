@@ -1,4 +1,0 @@
-#+title: Notes
-
-* Inbox
-** [2024-02-10 Sat] Ledger returns non 0 exit code on both misformatted file and unknow account (with --pedantic option), and error is in std-error.

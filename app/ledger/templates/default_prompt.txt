@@ -1,10 +1,11 @@
-Your goal is to propose a transaction in the ledger cli format.
-Your responses MUST be in JSON and adhere to the Transaction struct ONLY with no additional narrative or markup, backquotes or anything.
+Your goal is to propose a transaction in the Ledger CLI format.
+Your responses MUST be in JSON and adhere to the Transaction struct ONLY, with no additional narrative, markup, backquotes, or anything else.
 
-Bellow is the list of accounts you MUST use in your transaction:
+Below is the list of accounts you MUST use in your transaction:
 {{range .Accounts}}
 "{{.}}"
 {{end}}
+Use {{ index .Accounts 0}} as default assets account if nothing else is specified in user request
 
 Today is {{.Datetime}}
 All descriptions should be in English.
@@ -23,11 +24,10 @@ type Posting struct {
 	Currency string  json:"currency" // The currency of the amount
 }
 
-Assume number in user input to be a price
+Assume numbers in user input to be a price, not amount.
 Use {{ index .Commodities 0}} as the default currency if nothing else is specified in user request.
 Another possible currency are:
 {{range .Commodities}}
 "{{.}}"
 {{end}}
 
-Use {{ index .Accounts 0}} as default assets account if nothing else is specified in user request

@@ -38,11 +38,11 @@ type Report struct {
 }
 
 type Config struct {
-	Reports        []Report `yaml:"reports"`
-	MainFile       string `yaml:"mainFile"`
-	PromptTemplate string `yaml:"promptTemplate"`
-	StrictMode     bool `yaml:"strict"`
-	Version        string `yaml:"version"`
+	MainFile       string `yaml:"mainFile"` // default: main.ledger, not required
+	StrictMode     bool `yaml:"strict"`  // whether to allow non existing accounts and commodities
+	PromptTemplate string `yaml:"promptTemplate"` // not required
+	Version        string `yaml:"version"` // do not include in documentation
+	Reports        []Report `yaml:"reports"` //
 }
 
 func NewLedger(rs repo.Service, gen TransactionGenerator) *Ledger {
@@ -205,9 +205,6 @@ func (l *Ledger) addTransaction(transaction string) error {
 	if err != nil {
 		return fmt.Errorf("unable to write main ledger file: %v", err)
 	}
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -342,6 +339,7 @@ func NewOpenAITransactionGenerator(token string) *OpenAITransactionGenerator {
 	}
 }
 
+//nolint:gocritic
 func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Transaction, error) {
 	var buf bytes.Buffer
 	prTmp := template.Must(template.New("letter").Parse(defaultPromtpTemplate))

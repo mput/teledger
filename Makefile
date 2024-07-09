@@ -1,8 +1,5 @@
-
 start:
-	. ./.env.dev
-	go run app/main.go
+	. ./.env.dev && go run app/main.go
 
 test:
-	. ./.env.test
-	go test -v ./...
+	. ./.env.test && go test -v ./...

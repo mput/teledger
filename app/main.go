@@ -10,23 +10,8 @@ import (
 )
 
 
+// injected with ldflags
 var version = "dev"
-
-func setupLogger(debug bool) {
-	opts := &slog.HandlerOptions{
-        Level: slog.LevelInfo,
-    }
-
-	if debug {
-		opts.Level = slog.LevelDebug
-		opts.AddSource = true
-	}
-
-	textHandler := slog.NewTextHandler(os.Stdout, opts)
-	logger := slog.New(textHandler)
-
-	slog.SetDefault(logger)
-}
 
 func main() {
 	fmt.Printf("teledger v:%s\n", version)
@@ -37,7 +22,6 @@ func main() {
 		fmt.Printf("[ERROR] %v", err)
 		os.Exit(1)
 	}
-	setupLogger(opts.Debug)
 
 	nbot, err := bot.NewBot(&opts)
 	if err != nil {
