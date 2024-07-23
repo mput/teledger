@@ -6,11 +6,11 @@ require github.com/jessevdk/go-flags v1.5.0
 
 require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.27
+	github.com/dustin/go-humanize v1.0.1
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/joho/godotenv v1.5.1
-	github.com/dustin/go-humanize v1.0.1
-	github.com/sashabaranov/go-openai v1.26.0
+	github.com/sashabaranov/go-openai v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
