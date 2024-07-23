@@ -1,0 +1,22 @@
+{{ if .Committed }}
+✅ <b>Committed!</b>
+{{- end -}}
+{{ if .UserProvidedTransaction }}
+Provided a valid transaction:
+<pre>
+{{  .UserProvidedTransaction }}
+</pre>
+{{ end }}
+{{- if .GeneratedTransaction }}
+<b>Transaction:</b>
+<pre>
+{{  .GeneratedTransaction -}}
+</pre>
+<i>{{ .AttemptNumber }} attempt</i>
+{{ end -}}
+{{ if .Error }}
+🛑 Error:
+<code>
+{{-  .Error -}}
+</code>
+{{ end }}

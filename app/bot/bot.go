@@ -1,7 +1,10 @@
 package bot
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"strings"
 	"time"
@@ -9,11 +12,10 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/mput/teledger/app/teledger"
 	"github.com/mput/teledger/app/ledger"
 	"github.com/mput/teledger/app/repo"
+	"github.com/mput/teledger/app/teledger"
 )
-
 
 type Opts struct {
 	Telegram struct {
@@ -21,7 +23,7 @@ type Opts struct {
 	} `group:"telegram" namespace:"telegram" env-namespace:"TELEGRAM"`
 
 	Github struct {
-		URL string `long:"url" env:"URL" required:"true" description:"github repo url"`
+		URL   string `long:"url" env:"URL" required:"true" description:"github repo url"`
 		Token string `long:"token" env:"TOKEN" required:"true" description:"fine-grained personal access tokens for repo with RW Contents scope"`
 	} `group:"github" namespace:"github" env-namespace:"GITHUB"`
 
@@ -34,9 +36,9 @@ type Opts struct {
 }
 
 type Bot struct {
-	opts *Opts
+	opts     *Opts
 	teledger *teledger.Teledger
-	bot *gotgbot.Bot
+	bot      *gotgbot.Bot
 }
 
 func NewBot(opts *Opts) (*Bot, error) {
@@ -57,9 +59,9 @@ func NewBot(opts *Opts) (*Bot, error) {
 	}
 
 	return &Bot{
-		opts: opts,
+		opts:     opts,
 		teledger: tel,
-		bot: b,
+		bot:      b,
 	}, nil
 
 }
@@ -67,7 +69,6 @@ func NewBot(opts *Opts) (*Bot, error) {
 func (bot *Bot) Start() error {
 	defaultCommands := []gotgbot.BotCommand{
 		{Command: "reports", Description: "Show available reports"},
-		{Command: "balance", Description: "Show balance"},
 		{Command: "version", Description: "Show version"},
 	}
 	smcRes, err := bot.bot.SetMyCommands(defaultCommands, nil)
@@ -87,22 +88,16 @@ func (bot *Bot) Start() error {
 
 	updater := ext.NewUpdater(dispatcher, nil)
 
-
-
-
-
 	dispatcher.AddHandler(handlers.NewCommand("reports", wrapUserResponse(bot.showAvailableReports, "reports")))
 	dispatcher.AddHandler(handlers.NewCallback(isReportCallback, wrapUserResponse(bot.showReport, "show-report")))
 
-
 	dispatcher.AddHandler(handlers.NewCommand("start", wrapUserResponse(start, "start")))
 	dispatcher.AddHandler(handlers.NewCommand("version", wrapUserResponse(bot.vesrion, "version")))
-	dispatcher.AddHandler(handlers.NewCommand("balance", wrapUserResponse(bot.bal, "balance")))
 
 	// these handlers should be at the end, as they are less specific
 	dispatcher.AddHandler(handlers.NewCommand("/", wrapUserResponse(bot.comment, "comment")))
 	dispatcher.AddHandler(handlers.NewMessage(nil, wrapUserResponse(bot.proposeTransaction, "propose-transaction")))
-
+	dispatcher.AddHandler(handlers.NewCallback(isConfirmCallback, bot.confirmTransaction))
 
 	// Start receiving updates.
 	err = updater.StartPolling(bot.bot, &ext.PollingOpts{
@@ -115,7 +110,7 @@ func (bot *Bot) Start() error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start polling: %v",  err)
+		return fmt.Errorf("failed to start polling: %v", err)
 	}
 	slog.Info("bot has been started", "bot-name", bot.bot.Username)
 	updater.Idle()
@@ -123,9 +118,9 @@ func (bot *Bot) Start() error {
 	return nil
 }
 
-
 type response func(ctx *ext.Context) (msg string, opts *gotgbot.SendMessageOpts, err error)
-func wrapUserResponse (next response, name string) handlers.Response {
+
+func wrapUserResponse(next response, name string) handlers.Response {
 	return func(b *gotgbot.Bot, ctx *ext.Context) error {
 		start := time.Now()
 		msg := ctx.EffectiveMessage
@@ -135,14 +130,14 @@ func wrapUserResponse (next response, name string) handlers.Response {
 				"error in bot handler",
 				"error", err,
 				"duration", time.Since(start),
-				"from",  msg.From.Username,
+				"from", msg.From.Username,
 				"handler", name,
 			)
 		} else {
 			slog.Info(
 				"handler success",
 				"duration", time.Since(start),
-				"from",  msg.From.Username,
+				"from", msg.From.Username,
 				"handler", name,
 			)
 
@@ -154,7 +149,7 @@ func wrapUserResponse (next response, name string) handlers.Response {
 					"unable to send response",
 					"error", ierr,
 					"duration", time.Since(start),
-					"from",  msg.From.Username,
+					"from", msg.From.Username,
 					"handler", name,
 				)
 			}
@@ -168,18 +163,9 @@ func start(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 }
 
 func (bot *Bot) vesrion(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
-	return fmt.Sprintf("teledger v: %s", bot.opts.Version), nil , nil
+	return fmt.Sprintf("teledger v: %s", bot.opts.Version), nil, nil
 }
 
-func (bot *Bot) bal(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
-	balance, err := bot.teledger.Balance()
-	if err != nil {
-		werr := fmt.Errorf("unable to get balance: %v", err)
-		return werr.Error(), nil, werr
-	}
-
-	return fmt.Sprintf("```%s```", balance), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
-}
 
 func (bot *Bot) comment(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	msg := ctx.EffectiveMessage
@@ -200,18 +186,42 @@ func (bot *Bot) comment(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, err
 	return fmt.Sprintf("```\n%s\n```", comment), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }
 
+//go:embed templates/propose_transaction.html
+var proposeTemplateS string
+var proposeTemplate = template.Must(template.New("letter").Parse(proposeTemplateS))
+
 func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	msg := ctx.EffectiveMessage
 
-	transaction, err := bot.teledger.ProposeTransaction(msg.Text)
+	pendTr := bot.teledger.ProposeTransaction(msg.Text)
 
+	var buf bytes.Buffer
+	err := proposeTemplate.Execute(&buf, pendTr)
 	if err != nil {
-		return fmt.Sprintf("Error: %v", err), nil, nil
+		return "", nil, fmt.Errorf("unable to execute template: %v", err)
 	}
 
-	return transaction, &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
-}
+	inlineKeyboard := [][]gotgbot.InlineKeyboardButton{}
 
+	if key := pendTr.PendingKey; key != "" {
+		inlineKeyboard = append(inlineKeyboard, []gotgbot.InlineKeyboardButton{
+			{
+				Text:         "✅ Confirm",
+				CallbackData: fmt.Sprintf("%s%s",confirmPrefix, key),
+			},
+		})
+	}
+
+	return buf.String(), &gotgbot.SendMessageOpts{
+		ParseMode: "HTML",
+		ReplyParameters: &gotgbot.ReplyParameters{MessageId: msg.MessageId},
+		DisableNotification: true,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{
+			InlineKeyboard: inlineKeyboard,
+		},
+
+	}, nil
+}
 
 func (bot *Bot) showAvailableReports(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	reports := bot.teledger.Ledger.Config.Reports
@@ -221,7 +231,7 @@ func (bot *Bot) showAvailableReports(_ *ext.Context) (string, *gotgbot.SendMessa
 	for _, report := range reports {
 		inlineKeyboard = append(inlineKeyboard, []gotgbot.InlineKeyboardButton{
 			{
-				Text: report.Title,
+				Text:         report.Title,
 				CallbackData: fmt.Sprintf("report:%s", report.Title),
 			},
 		})
@@ -232,14 +242,102 @@ func (bot *Bot) showAvailableReports(_ *ext.Context) (string, *gotgbot.SendMessa
 		ReplyMarkup: gotgbot.InlineKeyboardMarkup{
 			InlineKeyboard: inlineKeyboard,
 		},
-
 	}
 
 	return "Available reports:", opts, nil
 }
 
-func isReportCallback(_ *gotgbot.CallbackQuery) bool {
-	return true
+func isReportCallback(cb *gotgbot.CallbackQuery) bool {
+	return strings.HasPrefix(cb.Data, "report:")
+}
+
+const confirmPrefix = "cf:"
+const deletePrefix =  "rm:"
+
+func isConfirmCallback(cb *gotgbot.CallbackQuery) bool {
+	return strings.HasPrefix(cb.Data, confirmPrefix)
+}
+
+func (bot *Bot) confirmTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
+	cq := ctx.CallbackQuery
+
+	_, _, err := bot.bot.EditMessageReplyMarkup(
+		&gotgbot.EditMessageReplyMarkupOpts{
+			MessageId: cq.Message.GetMessageId(),
+			ChatId: cq.Message.GetChat().Id,
+			InlineMessageId: cq.InlineMessageId,
+			ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+		},
+	)
+
+	if err != nil {
+		slog.Error("unable to edit inline keyboard", "error", err)
+	}
+
+
+	key := strings.TrimPrefix(cq.Data, confirmPrefix)
+	pendTr, err := bot.teledger.ConfirmTransaction(key)
+
+	var newMessageContent bytes.Buffer
+	if err == nil {
+		err2 := proposeTemplate.Execute(&newMessageContent, pendTr)
+		if err2 != nil {
+			err = err2
+		}
+
+	}
+
+	if err != nil {
+		_, _ = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
+			ShowAlert: true,
+			Text: fmt.Sprintf("🛑️ Error!\n%s", err)  ,
+		})
+
+		_, _, _ = bot.bot.EditMessageReplyMarkup(
+			&gotgbot.EditMessageReplyMarkupOpts{
+				MessageId: cq.Message.GetMessageId(),
+				ChatId: cq.Message.GetChat().Id,
+				InlineMessageId: cq.InlineMessageId,
+				ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+			},
+		)
+
+		return nil
+	}
+
+
+	_, _, err = bot.bot.EditMessageText(
+		newMessageContent.String(),
+		&gotgbot.EditMessageTextOpts{
+			MessageId: cq.Message.GetMessageId(),
+			ChatId: cq.Message.GetChat().Id,
+			InlineMessageId: cq.InlineMessageId,
+			ParseMode: "HTML",
+			ReplyMarkup: gotgbot.InlineKeyboardMarkup{
+				InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+					[]gotgbot.InlineKeyboardButton{
+						{
+							Text:         "🛑 Delete",
+							CallbackData: fmt.Sprint(deletePrefix, key),
+						},
+					},
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		slog.Error("unable to edit message", "error", err)
+	}
+
+	_, err = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
+		Text: "✔️ confirmed",
+	})
+
+	if err != nil {
+		slog.Error("unable to answer callback query", "error", err)
+	}
+	return nil
 }
 
 func (bot *Bot) showReport(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
@@ -252,14 +350,12 @@ func (bot *Bot) showReport(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, 
 		slog.Error("unable to answer callback query", "error", err)
 	}
 
-
 	reportTitle := strings.TrimPrefix(cq.Data, "report:")
 	report, err := bot.teledger.Report(reportTitle)
 
 	if err != nil {
 		return fmt.Sprintf("Error: %v", err), nil, nil
 	}
-
 
 	return fmt.Sprintf("```\n%s\n```", report), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
 }

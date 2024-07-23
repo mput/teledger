@@ -2,6 +2,7 @@ package teledger
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/mput/teledger/app/ledger"
@@ -10,13 +11,15 @@ import (
 // Teledger is the service that handles all the
 // operations related to the Ledger files
 type Teledger struct {
-	Ledger *ledger.Ledger
+	Ledger                        *ledger.Ledger
+	WaitingToBeConfirmedResponses *map[string]*PendingTransaction
 }
 
-
 func NewTeledger(ldgr *ledger.Ledger) *Teledger {
+	m := make(map[string]*PendingTransaction)
 	return &Teledger{
 		Ledger: ldgr,
+		WaitingToBeConfirmedResponses: &m,
 	}
 }
 
@@ -66,15 +69,15 @@ func (tel *Teledger) Report(reportTitle string) (string, error) {
 	return tel.Ledger.Execute(reportArgs...)
 }
 
-
 func (tel *Teledger) Init() error {
 	_, err := tel.Ledger.Execute("bal")
-	return  err
+	return err
 }
 
-
-func inBacktick(s string) string {
-	return fmt.Sprintf("```\n%s\n```", s)
+type PendingTransaction struct {
+	ledger.ProposeTransactionRespones
+	PendingKey string
+	Mu sync.Mutex
 }
 
 // Receive a short free-text description of a transaction
@@ -82,28 +85,39 @@ func inBacktick(s string) string {
 // ledger file.
 // Store the transaction in a state, so the user can confirm
 // or reject it.
-func (tel *Teledger) ProposeTransaction(desc string) (string, error) {
-	wasGenerated, tr, err := tel.Ledger.AddOrProposeTransaction(desc, 2)
-	if wasGenerated {
-		if err == nil {
-			return inBacktick(tr.Format(false)), nil
-		}
+func (tel *Teledger) ProposeTransaction(desc string) *PendingTransaction {
+	resp := tel.Ledger.AddOrProposeTransaction(desc, 2)
+	pt := PendingTransaction{
+		ProposeTransactionRespones: resp,
+	}
+	if resp.Error == nil && resp.GeneratedTransaction != nil {
+		key := resp.GeneratedTransaction.RealDateTime.Format("2006-01-02 15:04:05.999 Mon")
+		pt.PendingKey = key
+		(*tel.WaitingToBeConfirmedResponses)[key] = &pt
+	}
+	return &pt
+}
 
-		if len(tr.Postings) == 0 {
-			return fmt.Sprintf(`Proposed but invalid transaction:
-%s`,
-				inBacktick(tr.Format(false)),
-			), nil
-		}
+func (tel *Teledger) ConfirmTransaction(pendingKey string) (*PendingTransaction, error) {
+	pendTr, ok := (*tel.WaitingToBeConfirmedResponses)[pendingKey]
+	if !ok {
+		return nil, fmt.Errorf("missing pending transaction: `%s`", pendingKey)
+	}
+	locked := pendTr.Mu.TryLock()
+	if !locked {
+		return nil, fmt.Errorf("transaction confirmation already in progress: `%s`", pendingKey)
+	}
+	defer pendTr.Mu.Unlock()
 
-		return "", err
+	err := tel.Ledger.AddTransactionWithID(pendTr.GeneratedTransaction.Format(true), pendingKey)
 
+	if err != nil {
+		// pendTr.Error = err
+		return nil, err
 	}
 
-	if err == nil {
-		return "Transaction Added", nil
-	}
-	return "", err
 
-
+	pendTr.Committed = true
+	delete(*tel.WaitingToBeConfirmedResponses, pendingKey)
+	return pendTr, nil
 }

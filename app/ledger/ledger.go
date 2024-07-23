@@ -38,11 +38,11 @@ type Report struct {
 }
 
 type Config struct {
-	MainFile       string `yaml:"mainFile"` // default: main.ledger, not required
-	StrictMode     bool `yaml:"strict"`  // whether to allow non existing accounts and commodities
-	PromptTemplate string `yaml:"promptTemplate"` // not required
-	Version        string `yaml:"version"` // do not include in documentation
-	Reports        []Report `yaml:"reports"` //
+	MainFile       string   `yaml:"mainFile"`       // default: main.ledger, not required
+	StrictMode     bool     `yaml:"strict"`         // whether to allow non existing accounts and commodities
+	PromptTemplate string   `yaml:"promptTemplate"` // not required
+	Version        string   `yaml:"version"`        // do not include in documentation
+	Reports        []Report `yaml:"reports"`        //
 }
 
 func NewLedger(rs repo.Service, gen TransactionGenerator) *Ledger {
@@ -219,7 +219,23 @@ func (l *Ledger) AddTransaction(transaction string) error {
 		return fmt.Errorf("unable to set config: %v", err)
 	}
 
-	return l.addTransaction(transaction)
+	err = l.addTransaction(transaction)
+
+	if err != nil {
+		return err
+	}
+
+	err = l.repo.CommitPush("New comment", "teledger", "teledger@example.com")
+	if err != nil {
+		return fmt.Errorf("unable to commit: %v", err)
+	}
+	return nil
+}
+
+const transactionIDPrefix = ";; tid:"
+
+func (l *Ledger) AddTransactionWithID(transaction , id string) error {
+	return l.AddTransaction(fmt.Sprintf("%s%s\n%s",transactionIDPrefix, id, transaction))
 }
 
 func (l *Ledger) validate() error {
@@ -300,7 +316,7 @@ func (t *Transaction) Format(withComment bool) string {
 	var res strings.Builder
 	if withComment {
 		res.WriteString(
-			wrapIntoComment(fmt.Sprintf("%s: %s", t.RealDateTime.Format("2006-01-02 15:04:05 Monday"), t.Comment)),
+			wrapIntoComment(t.Comment),
 		)
 		res.WriteString("\n")
 	}
@@ -312,6 +328,11 @@ func (t *Transaction) Format(withComment bool) string {
 
 	}
 	return res.String()
+}
+
+
+func (t *Transaction) String() string {
+	return t.Format(false)
 }
 
 // Posting represents a single posting in a transaction, linking an account with an amount and currency.
@@ -487,7 +508,9 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 		return trx, fmt.Errorf("unable to generate transaction: %v", err)
 	}
 
-	err = l.validateWith(trx.Format(true))
+	// try to add for validation
+	err = l.addTransaction(trx.Format(false))
+
 	if err != nil {
 		return trx, fmt.Errorf("unable to validate transaction: %v", err)
 	}
@@ -504,7 +527,6 @@ func parseConfig(r io.Reader, c *Config) error {
 	}
 	return nil
 }
-
 
 func (l *Ledger) setConfig() error {
 	if l.Config == nil {
@@ -537,50 +559,81 @@ func (l *Ledger) setConfig() error {
 	return nil
 }
 
+type ProposeTransactionRespones struct {
+	// If the user provided a valid transaction as
+	// a description, it will be stored here
+	UserProvidedTransaction string
+	// If the user provided just a human-readable description
+	// of the transaction, the proposed transaction will be stored here
+	GeneratedTransaction *Transaction
+	// It's possible that a transaction was generated, but it's invalid
+	Error error
+	// Attempt from which the transaction was generated
+	AttemptNumber int
+	Committed      bool
+}
 
-func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) (wasGenerated bool, tr Transaction, err error) {
-	wasGenerated = false
-	err = l.repo.Init()
+func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) ProposeTransactionRespones {
+	resp := ProposeTransactionRespones{}
+
+	// wasGenerated = false
+	err := l.repo.Init()
 	defer l.repo.Free()
 	if err != nil {
-		return wasGenerated, tr, err
+		resp.Error = err
+		return resp
+		// return wasGenerated, tr, err
 	}
+
 	err = l.setConfig()
 	if err != nil {
-		return wasGenerated, tr, fmt.Errorf("unable to set config: %v", err)
+		resp.Error = err
+		return resp
 	}
 
 	// first try to add userInput as transaction
 	err = l.addTransaction(userInput)
 	if err == nil {
+		// if user input was a valid transaction, commit it
 		err = l.repo.CommitPush("New comment", "teledger", "teledger@example.com")
+		resp.UserProvidedTransaction = userInput
 		if err != nil {
-			return wasGenerated, tr, err
+			resp.Error = err
+			return resp
 		}
-		return wasGenerated, tr, nil
+		resp.Committed = true
+		return resp
 	}
 
+	// if the error starts with "invalid transaction", it means that
+	// the user input was not a valid transaction.
+	// All other errors are returned as is, without trying to generate a transaction
 	if !strings.HasPrefix(err.Error(), "invalid transaction:") {
-		return wasGenerated, tr, err
+		resp.Error = err
+		return resp
 	}
 
-	// after this generate a transaction using LLM
-	wasGenerated = true
 	if attempts <= 0 {
 		panic("times should be greater than 0")
 	}
 
-	for i := 0; i < attempts; i++ {
-		if i > 0 {
+	var addErr error
+	var tr Transaction
+
+	for i := 1; i <= attempts; i++ {
+		if i > 1 {
 			slog.Warn("retrying transaction generation", "attempt", i)
 		}
-		tr, err = l.proposeTransaction(userInput)
-		if err == nil {
-			return wasGenerated, tr, nil
+		tr, addErr = l.proposeTransaction(userInput)
+		resp.Error = addErr
+		resp.GeneratedTransaction = &tr
+		resp.AttemptNumber = i
+		if addErr == nil {
+			return resp
 		}
 	}
 
-	return wasGenerated, tr, err
+	return resp
 }
 
 type PromptCtx struct {

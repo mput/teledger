@@ -4,11 +4,12 @@ import (
 	"strings"
 	"testing"
 
+	"os"
+	"time"
+
+	"github.com/joho/godotenv"
 	"github.com/mput/teledger/app/repo"
 	"github.com/stretchr/testify/assert"
-	"time"
-	"github.com/joho/godotenv"
-	"os"
 )
 
 func TestLedger_Execute(t *testing.T) {
@@ -156,14 +157,13 @@ dummy dummy
 	})
 }
 
-
 func TestLedger_ProposeTransaction(t *testing.T) {
 	mockCall := 0
 
 	var mockedTransactionGenerator *TransactionGeneratorMock
 
 	mockedTransactionGenerator = &TransactionGeneratorMock{
-		GenerateTransactionFunc: func(_ PromptCtx) (mocktr Transaction,err error) {
+		GenerateTransactionFunc: func(_ PromptCtx) (mocktr Transaction, err error) {
 			mockCall++
 			dt, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26.371Z")
 			// On the first attempt, return transaction that is not valid
@@ -171,17 +171,17 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 			if len(mockedTransactionGenerator.calls.GenerateTransaction) == 1 {
 				mocktr = Transaction{
 					RealDateTime: dt,
-					Description: "My tr",
-					Comment: "invalid transaction",
+					Description:  "My tr",
+					Comment:      "invalid transaction",
 					Postings: []Posting{
 						{
-							Account: "cash",
-							Amount: -3000.43,
+							Account:  "cash",
+							Amount:   -3000.43,
 							Currency: "EUR",
 						},
 						{
-							Account: "taxi",
-							Amount: 3000.43,
+							Account:  "taxi",
+							Amount:   3000.43,
 							Currency: "EUR",
 						},
 					},
@@ -189,17 +189,17 @@ func TestLedger_ProposeTransaction(t *testing.T) {
 			} else {
 				mocktr = Transaction{
 					RealDateTime: dt,
-					Comment: "valid transaction\n22 multiple lines",
-					Description: "Tacos",
+					Comment:      "valid transaction\n22 multiple lines",
+					Description:  "Tacos",
 					Postings: []Posting{
 						{
-							Account: "Assets:Cash",
-							Amount: -3000.43,
+							Account:  "Assets:Cash",
+							Amount:   -3000.43,
 							Currency: "EUR",
 						},
 						{
-							Account: "Food",
-							Amount: 3000.43,
+							Account:  "Food",
+							Amount:   3000.43,
 							Currency: "EUR",
 						},
 					},
@@ -228,7 +228,7 @@ strict: true
 	// strict mode
 	ledger := NewLedger(
 		&repo.Mock{Files: map[string]string{
-			"main.ledger": testFile,
+			"main.ledger":   testFile,
 			"teledger.yaml": configYaml,
 		}},
 		mockedTransactionGenerator,
@@ -236,26 +236,25 @@ strict: true
 
 	t.Run("happy path", func(t *testing.T) {
 
-
-		wasGenerated, tr, err := ledger.AddOrProposeTransaction("20 Taco Bell", 5)
+		resp := ledger.AddOrProposeTransaction("20 Taco Bell", 5)
 
 		assert.True(t, ledger.Config.StrictMode)
 
-		assert.True(t, wasGenerated)
+		// assert.True(t, wasGenerated)
+		assert.Equal(t, "", resp.UserProvidedTransaction)
 
-		assert.NoError(t, err)
+		assert.NoError(t, resp.Error)
 
 		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 2)
+		assert.Equal(t, 2, resp.AttemptNumber)
 
-		assert.Equal(t, "valid transaction\n22 multiple lines", tr.Comment)
-
+		assert.Equal(t, "valid transaction\n22 multiple lines", resp.GeneratedTransaction.Comment)
 
 		assert.Equal(
 			t,
-			[]string{"Food", "Assets:Cash", "Equity" },
+			[]string{"Food", "Assets:Cash", "Equity"},
 			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx.Accounts,
 		)
-
 
 		assert.Equal(
 			t,
@@ -263,54 +262,53 @@ strict: true
 			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx.Commodities,
 		)
 
-
 		assert.Equal(
 			t,
 			"20 Taco Bell",
 			mockedTransactionGenerator.calls.GenerateTransaction[0].PromptCtx.UserInput,
 		)
 
+		assert.False(t, resp.Committed)
 
 		assert.Equal(t,
-			`;; 2014-11-12 11:45:26 Wednesday: valid transaction
+			`;; valid transaction
 ;; 22 multiple lines
 2014-11-12 * Tacos
     Assets:Cash  -3.000,43 EUR
     Food  3.000,43 EUR
 `,
-			tr.Format(true),
+			resp.GeneratedTransaction.Format(true),
 		)
 	})
 
 	t.Run("add an already valid transaction", func(t *testing.T) {
 		mockedTransactionGenerator.ResetCalls()
 
-		wasGenerated, _, err := ledger.AddOrProposeTransaction(`
+		resp := ledger.AddOrProposeTransaction(`
 2014-11-12 * Tacos
     Assets:Cash  -2,43 EUR
     Food  2,43 EUR
 `, 1)
 
-		assert.False(t, wasGenerated)
-		assert.NoError(t, err)
+		assert.Nil(t, resp.GeneratedTransaction)
+		assert.True(t, resp.Committed)
+		assert.NoError(t, resp.Error)
 		assert.Equal(t, 0, len(mockedTransactionGenerator.calls.GenerateTransaction))
+		assert.Equal(t, 0, resp.AttemptNumber)
 
 	})
 
 	t.Run("validation error path", func(t *testing.T) {
 		mockedTransactionGenerator.ResetCalls()
 
-		_, _, err := ledger.AddOrProposeTransaction("20 Taco Bell", 1)
-
-		assert.ErrorContains(t, err, "Unknown account 'cash'")
+		resp := ledger.AddOrProposeTransaction("20 Taco Bell", 1)
+		assert.ErrorContains(t, resp.Error, "Unknown account 'cash'")
 
 		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 1)
 
 	})
 
-
 }
-
 
 func TestWithRepo(t *testing.T) {
 	_ = godotenv.Load("../../.env.dev")
@@ -336,6 +334,5 @@ func TestWithRepo(t *testing.T) {
 	assert.True(t, ledger.Config.StrictMode)
 
 	assert.NotEmpty(t, res)
-
 
 }
