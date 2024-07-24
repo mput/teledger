@@ -117,8 +117,6 @@ strict: true
 			(*tldgr.WaitingToBeConfirmedResponses)[resp.PendingKey].Mu.Unlock()
 		})
 
-		r.Files["main.ledger"] = initContent
-
 		assert.NotEmpty(t, resp.PendingKey)
 		_, err := tldgr.ConfirmTransaction(resp.PendingKey)
 		assert.Empty(t, err)

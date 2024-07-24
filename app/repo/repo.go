@@ -2,7 +2,6 @@ package repo
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -25,9 +24,9 @@ type Service interface {
 	// Release the lock and free resources
 	Free()
 
-	Open(file string) (io.ReadCloser, error)
-	OpenForAppend(file string) (io.WriteCloser, error)
-	OpenFile(file string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
+	OpenFile(file string, flag int, perm os.FileMode) (billy.File, error)
+	Open(file string) (billy.File, error)
+	OpenForAppend(file string) (billy.File, error)
 	CommitPush(msg, name, email string) error
 }
 
@@ -82,37 +81,27 @@ func (imr *InMemoryRepo) Free() {
 	imr.initedMu.Unlock()
 }
 
-func (imr *InMemoryRepo) Open(file string) (io.ReadCloser, error) {
-	if !imr.inited {
-		return nil, fmt.Errorf("not initialized")
-	}
-	wtr, err := imr.repo.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("worktree receiving error: %v", err)
-	}
-	return wtr.Filesystem.Open(file)
+func (imr *InMemoryRepo) Open(filename string) (billy.File, error) {
+	return imr.OpenFile(filename, os.O_RDONLY, 0)
 }
 
-type WriteCloser struct {
-	f *billy.File
+
+func (imr *InMemoryRepo) OpenForAppend(filename string) (billy.File, error) {
+	return imr.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0600)
+}
+
+type RepoCloser struct {
+	billy.File
 	r *InMemoryRepo
 	path string
 }
 
-func (w *WriteCloser) Write(p []byte) (n int, err error) {
-	return (*w.f).Write(p)
-}
-
-func (w *WriteCloser) Read(p []byte) (n int, err error) {
-	return (*w.f).Read(p)
-}
-
-func (w *WriteCloser) Close() error {
+func (w *RepoCloser) Close() error {
 	w.r.dirtyFiles[w.path] = true
-	return (*w.f).Close()
+	return w.File.Close()
 }
 
-func (imr *InMemoryRepo) OpenFile(file string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+func (imr *InMemoryRepo) OpenFile(file string, flag int, perm os.FileMode) (billy.File, error) {
 	if !imr.inited {
 		return nil, fmt.Errorf("not initialized")
 	}
@@ -121,20 +110,12 @@ func (imr *InMemoryRepo) OpenFile(file string, flag int, perm os.FileMode) (io.R
 		return nil, fmt.Errorf("worktree receiving error: %v", err)
 	}
 	f, err := wtr.Filesystem.OpenFile(file, flag, perm)
-	wc := WriteCloser{
+	wc := RepoCloser{
 		r: imr,
 		path: file,
-		f: &f,
+		File: f,
 	}
 	return &wc, err
-}
-
-
-func (imr *InMemoryRepo) OpenForAppend(file string) (io.WriteCloser, error) {
-	if !imr.inited {
-		return nil, fmt.Errorf("not initialized")
-	}
-	return imr.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0o666)
 }
 
 

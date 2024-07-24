@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
+
+	"github.com/go-git/go-billy/v5"
+	"github.com/go-git/go-billy/v5/memfs"
 )
 
 
 type Mock struct {
 	Files map[string]string
-	files map[string]string
+	fs billy.Filesystem
 	inited bool
 }
 
@@ -18,59 +20,71 @@ func (r *Mock) Init() error {
 	if r.inited {
 		return fmt.Errorf("already initialized")
 	}
-	r.files = r.Files
+	r.fs = memfs.New()
+	for fname, content := range r.Files {
+		f, err := r.fs.Create(fname)
+		if err != nil {
+			return err
+		}
+		_, err = f.Write([]byte(content))
+		if err != nil {
+			return err
+		}
+
+		err = f.Close()
+
+		if err != nil {
+			return err
+		}
+	}
 	r.inited = true
 	return nil
 }
 
 func (r *Mock) Free() {
+	if !r.inited {
+		panic("not initialized")
+	}
 	r.inited = false
-	r.files = nil
 }
 
-func (r *Mock) Open(file string) (io.ReadCloser, error) {
+func (r *Mock) OpenFile(filename string, flag int, perm os.FileMode) (billy.File, error) {
 	if !r.inited {
 		return nil, fmt.Errorf("not initialized")
 	}
-	if content, ok := r.files[file]; ok {
-		return io.NopCloser(strings.NewReader(content)), nil
-	}
-	return nil, os.ErrNotExist
+	return r.fs.OpenFile(filename, flag, perm)
 }
 
-func (r *Mock) OpenFile(_ string, _ int, _ os.FileMode) (io.ReadWriteCloser, error) {
-	if !r.inited {
-		return nil, fmt.Errorf("not initialized")
-	}
-	return nil, fmt.Errorf("not implemented")
+
+func (r *Mock) Open(filename string) (billy.File, error) {
+	return r.OpenFile(filename, os.O_RDONLY, 0)
 }
 
-func (r *Mock) OpenForAppend(file string) (io.WriteCloser, error) {
-	if !r.inited {
-		return nil, fmt.Errorf("not initialized")
-	}
-	if content, ok := r.files[file]; ok {
-		return &WriteCloserT{r: r, f: file, dt: []byte(content)}, nil
-	}
-	return nil, os.ErrNotExist
+func (r *Mock) OpenForAppend(filename string) (billy.File, error) {
+	return r.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0600)
 }
 
-type WriteCloserT struct {
-	r *Mock
-	f string
-	dt []byte
-}
-
-func (w *WriteCloserT) Write(p []byte) (n int, err error) {
-	w.dt = append(w.dt, p...)
-	return len(p), nil
-}
-
-func (w *WriteCloserT) Close() error {
-	w.r.files[w.f] = string(w.dt)
-	return nil
-}
 
 func (r *Mock) CommitPush(_, _, _ string) error {
+	for fname, _ := range r.Files {
+		f, err := r.fs.Open(fname)
+		if err != nil {
+			return err
+		}
+		fc, err := io.ReadAll(f)
+
+		if err != nil {
+			return err
+		}
+
+		r.Files[fname] = string(fc)
+
+		err = f.Close()
+
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
