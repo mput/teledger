@@ -163,7 +163,11 @@ func start(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 }
 
 func (bot *Bot) vesrion(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
-	return fmt.Sprintf("teledger v: %s", bot.opts.Version), nil, nil
+	return fmt.Sprintf("teledger v: %s", bot.opts.Version),
+		&gotgbot.SendMessageOpts{
+			DisableNotification: true,
+		},
+		nil
 }
 
 
@@ -183,7 +187,10 @@ func (bot *Bot) comment(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, err
 		return fmt.Sprintf("Error: %v", err), nil, nil
 	}
 
-	return fmt.Sprintf("```\n%s\n```", comment), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
+	return fmt.Sprintf("```\n%s\n```", comment), &gotgbot.SendMessageOpts{
+		ParseMode: "MarkdownV2",
+		DisableNotification: true,
+	}, nil
 }
 
 //go:embed templates/propose_transaction.html
@@ -214,7 +221,7 @@ func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessa
 
 	return buf.String(), &gotgbot.SendMessageOpts{
 		ParseMode: "HTML",
-		ReplyParameters: &gotgbot.ReplyParameters{MessageId: msg.MessageId},
+		// ReplyParameters: &gotgbot.ReplyParameters{MessageId: msg.MessageId},
 		DisableNotification: true,
 		ReplyMarkup: gotgbot.InlineKeyboardMarkup{
 			InlineKeyboard: inlineKeyboard,
@@ -239,6 +246,7 @@ func (bot *Bot) showAvailableReports(_ *ext.Context) (string, *gotgbot.SendMessa
 
 	opts := &gotgbot.SendMessageOpts{
 		ParseMode: "MarkdownV2",
+		DisableNotification: true,
 		ReplyMarkup: gotgbot.InlineKeyboardMarkup{
 			InlineKeyboard: inlineKeyboard,
 		},
@@ -357,5 +365,8 @@ func (bot *Bot) showReport(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, 
 		return fmt.Sprintf("Error: %v", err), nil, nil
 	}
 
-	return fmt.Sprintf("```\n%s\n```", report), &gotgbot.SendMessageOpts{ParseMode: "MarkdownV2"}, nil
+	return fmt.Sprintf("```\n%s\n```", report), &gotgbot.SendMessageOpts{
+		ParseMode: "MarkdownV2",
+		DisableNotification: true,
+	}, nil
 }
