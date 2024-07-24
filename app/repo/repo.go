@@ -87,16 +87,16 @@ func (imr *InMemoryRepo) Open(filename string) (billy.File, error) {
 
 
 func (imr *InMemoryRepo) OpenForAppend(filename string) (billy.File, error) {
-	return imr.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0600)
+	return imr.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0)
 }
 
-type RepoCloser struct {
+type Closer struct {
 	billy.File
 	r *InMemoryRepo
 	path string
 }
 
-func (w *RepoCloser) Close() error {
+func (w *Closer) Close() error {
 	w.r.dirtyFiles[w.path] = true
 	return w.File.Close()
 }
@@ -110,7 +110,7 @@ func (imr *InMemoryRepo) OpenFile(file string, flag int, perm os.FileMode) (bill
 		return nil, fmt.Errorf("worktree receiving error: %v", err)
 	}
 	f, err := wtr.Filesystem.OpenFile(file, flag, perm)
-	wc := RepoCloser{
+	wc := Closer{
 		r: imr,
 		path: file,
 		File: f,

@@ -109,6 +109,7 @@ strict: true
 		resp := tldgr.ProposeTransaction("valid")
 		assert.NotEmpty(t, resp.PendingKey)
 		assert.Empty(t, resp.Error)
+		assert.NotEmpty(t, resp.PendingKey)
 
 		t.Run("attempt to concurrently confirm the same transaction", func(t *testing.T) {
 			(*tldgr.WaitingToBeConfirmedResponses)[resp.PendingKey].Mu.Lock()
@@ -117,14 +118,14 @@ strict: true
 			(*tldgr.WaitingToBeConfirmedResponses)[resp.PendingKey].Mu.Unlock()
 		})
 
-		assert.NotEmpty(t, resp.PendingKey)
-		_, err := tldgr.ConfirmTransaction(resp.PendingKey)
-		assert.Empty(t, err)
+		t.Run("Success Confirmation",  func(t *testing.T) {
+			_, err := tldgr.ConfirmTransaction(resp.PendingKey)
+			assert.Empty(t, err)
 
-		assert.Equal(
-			t,
-			r.Files["main.ledger"],
-			`
+			assert.Equal(
+				t,
+				r.Files["main.ledger"],
+				`
 account Food
 account Assets:Cash
 account Equity
@@ -139,20 +140,129 @@ commodity EUR
 2014-11-30 * My tr
     Assets:Cash  -10,00 EUR
     Food  10,00 EUR
-
 `,
-		)
+			)
+
+		})
 
 		t.Run("attempt to confirm for the second time",  func(t *testing.T) {
-			_, err = tldgr.ConfirmTransaction(resp.PendingKey)
+			_, err := tldgr.ConfirmTransaction(resp.PendingKey)
 			assert.ErrorContains(t, err, "missing pending transaction")
 
 		})
 
 
 		t.Run("attempt to confirm with unknonw key", func(t *testing.T) {
-			_, err = tldgr.ConfirmTransaction("unk")
+			_, err := tldgr.ConfirmTransaction("unk")
 			assert.ErrorContains(t, err, "missing pending transaction")
+		})
+
+		t.Run("delete previously confirmed transaction", func(t *testing.T) {
+			err := tldgr.DeleteTransaction(resp.PendingKey)
+			assert.Empty(t, err)
+
+			assert.Equal(
+				t,
+				initContent,
+				r.Files["main.ledger"],
+			)
+
+		})
+
+		t.Run("delete unknown transaction", func(t *testing.T) {
+			err := tldgr.DeleteTransaction("unknowntrr")
+			assert.ErrorContains(t, err, "no transaction with id")
+
+			assert.Equal(
+				t,
+				initContent,
+				r.Files["main.ledger"],
+			)
+
+		})
+
+		t.Run("delete transaction corner cases", func(t *testing.T) {
+			initCoreners := `
+commodity EUR
+
+;; tid:2014-11-30 11:45:26.111 Sun
+;; valid
+2014-11-30 * My tr
+    Assets:Cash  -10,00 EUR
+    Food  10,00 EUR
+
+;; tid:2014-11-30 11:45:26.371 Sun
+;; valid
+2014-11-30 * My tr
+    Assets:Cash  -10,00 EUR
+    Food  10,00 EUR
+
+;; tid:2014-11-30 11:45:26.371 Sun
+;; valid
+2014-11-30 * My tr
+    Assets:Cash  -10,00 EUR
+    Food  10,00 EUR
+`
+
+
+			r := &repo.Mock{
+				Files: map[string]string{"main.ledger": initCoreners},
+			}
+
+			l := ledger.NewLedger(r, nil)
+
+			tldgr := &Teledger{
+				Ledger: l,
+			}
+
+			t.Run("transaction in the middle", func(t *testing.T) {
+				err :=tldgr.DeleteTransaction("2014-11-30 11:45:26.111 Sun")
+				assert.Empty(t, err)
+
+				assert.Equal(
+					t,
+					`
+commodity EUR
+
+;; tid:2014-11-30 11:45:26.371 Sun
+;; valid
+2014-11-30 * My tr
+    Assets:Cash  -10,00 EUR
+    Food  10,00 EUR
+
+;; tid:2014-11-30 11:45:26.371 Sun
+;; valid
+2014-11-30 * My tr
+    Assets:Cash  -10,00 EUR
+    Food  10,00 EUR
+`,
+					r.Files["main.ledger"],
+				)
+
+			})
+
+			t.Run("repeating transaction", func(t *testing.T) {
+				err :=tldgr.DeleteTransaction("2014-11-30 11:45:26.371 Sun")
+				assert.Empty(t, err)
+
+				assert.Equal(
+					t,
+					`
+commodity EUR
+
+;; tid:2014-11-30 11:45:26.371 Sun
+;; valid
+2014-11-30 * My tr
+    Assets:Cash  -10,00 EUR
+    Food  10,00 EUR
+`,
+					r.Files["main.ledger"],
+				)
+
+			})
+
+
+
 		})
 
 		t.Run("propose valid transaction, not free form explanation", func(t *testing.T) {

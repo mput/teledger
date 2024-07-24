@@ -200,7 +200,7 @@ func (l *Ledger) addTransaction(transaction string) error {
 	if err != nil {
 		return fmt.Errorf("unable to open main ledger file: %v", err)
 	}
-	_, err = fmt.Fprintf(r, "\n%s\n", transaction)
+	_, err = fmt.Fprintf(r, "\n%s", transaction)
 	defer r.Close()
 	if err != nil {
 		return fmt.Errorf("unable to write main ledger file: %v", err)
@@ -236,6 +236,94 @@ const transactionIDPrefix = ";; tid:"
 
 func (l *Ledger) AddTransactionWithID(transaction , id string) error {
 	return l.AddTransaction(fmt.Sprintf("%s%s\n%s",transactionIDPrefix, id, transaction))
+}
+
+func filterOutTransactionWithID(r io.Reader, id string) (content []byte, err error) {
+	scanner := bufio.NewScanner(r)
+	marker := transactionIDPrefix + id
+
+	afterMarker := 0
+
+	for scanner.Scan() {
+		txt := scanner.Text()
+
+		if (afterMarker == 0 && txt == marker) {
+			afterMarker++
+			if len(content) > 0 && content[len(content) - 1] == '\n' {
+				content = content[:len(content) - 1]
+			}
+			continue
+		}
+		if (afterMarker == 1 && txt == "") {
+			afterMarker++
+			content = append(content, '\n')
+			continue
+		}
+		if afterMarker == 1 {
+			continue
+		}
+		content = append(content, scanner.Bytes()...)
+		content = append(content, '\n')
+	}
+	if err := scanner.Err(); err != nil {
+		return content, fmt.Errorf("reading standard input: %v", err)
+	}
+	if afterMarker == 0 {
+		return content, fmt.Errorf("no transaction with id '%s' was found", id)
+	}
+	return content, nil
+
+}
+
+func (l *Ledger) DeleteTransactionWithID(id string) error {
+	err := l.repo.Init()
+	defer l.repo.Free()
+	if err != nil {
+		return fmt.Errorf("unable to init repo: %v", err)
+	}
+	err = l.setConfig()
+	if err != nil {
+		return fmt.Errorf("unable to set config: %v", err)
+	}
+
+	f, err := l.repo.OpenFile(l.Config.MainFile, os.O_RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("unable to open main ledger file: %v", err)
+	}
+
+	newContent, err := filterOutTransactionWithID(f, id)
+	if err != nil {
+		return err
+	}
+
+	err = f.Truncate(0)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Seek(0, 0)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(newContent)
+
+	if err != nil {
+		return err
+	}
+
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("unable to close main ledger file: %v", err)
+	}
+
+	err = l.repo.CommitPush("New comment", "teledger", "teledger@example.com")
+	if err != nil {
+		return fmt.Errorf("unable to commit: %v", err)
+	}
+
+	return nil
 }
 
 func (l *Ledger) validate() error {
@@ -576,13 +664,11 @@ type ProposeTransactionRespones struct {
 func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) ProposeTransactionRespones {
 	resp := ProposeTransactionRespones{}
 
-	// wasGenerated = false
 	err := l.repo.Init()
 	defer l.repo.Free()
 	if err != nil {
 		resp.Error = err
 		return resp
-		// return wasGenerated, tr, err
 	}
 
 	err = l.setConfig()

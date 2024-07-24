@@ -240,7 +240,6 @@ strict: true
 
 		assert.True(t, ledger.Config.StrictMode)
 
-		// assert.True(t, wasGenerated)
 		assert.Equal(t, "", resp.UserProvidedTransaction)
 
 		assert.NoError(t, resp.Error)

@@ -112,12 +112,14 @@ func (tel *Teledger) ConfirmTransaction(pendingKey string) (*PendingTransaction,
 	err := tel.Ledger.AddTransactionWithID(pendTr.GeneratedTransaction.Format(true), pendingKey)
 
 	if err != nil {
-		// pendTr.Error = err
 		return nil, err
 	}
-
 
 	pendTr.Committed = true
 	delete(*tel.WaitingToBeConfirmedResponses, pendingKey)
 	return pendTr, nil
+}
+
+func (tel *Teledger) DeleteTransaction(pendingKey string) error {
+	return tel.Ledger.DeleteTransactionWithID(pendingKey)
 }

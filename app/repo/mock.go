@@ -61,7 +61,7 @@ func (r *Mock) Open(filename string) (billy.File, error) {
 }
 
 func (r *Mock) OpenForAppend(filename string) (billy.File, error) {
-	return r.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0600)
+	return r.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0)
 }
 
 
