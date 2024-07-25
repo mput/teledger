@@ -98,6 +98,7 @@ func (bot *Bot) Start() error {
 	dispatcher.AddHandler(handlers.NewCommand("/", wrapUserResponse(bot.comment, "comment")))
 	dispatcher.AddHandler(handlers.NewMessage(nil, wrapUserResponse(bot.proposeTransaction, "propose-transaction")))
 	dispatcher.AddHandler(handlers.NewCallback(isConfirmCallback, bot.confirmTransaction))
+	dispatcher.AddHandler(handlers.NewCallback(isDeleteCallback, bot.deleteTransaction))
 
 	// Start receiving updates.
 	err = updater.StartPolling(bot.bot, &ext.PollingOpts{
@@ -266,6 +267,10 @@ func isConfirmCallback(cb *gotgbot.CallbackQuery) bool {
 	return strings.HasPrefix(cb.Data, confirmPrefix)
 }
 
+func isDeleteCallback(cb *gotgbot.CallbackQuery) bool {
+	return strings.HasPrefix(cb.Data, deletePrefix)
+}
+
 func (bot *Bot) confirmTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 	cq := ctx.CallbackQuery
 
@@ -336,6 +341,42 @@ func (bot *Bot) confirmTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 
 	if err != nil {
 		slog.Error("unable to edit message", "error", err)
+	}
+
+	_, err = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
+		Text: "✔️ confirmed",
+	})
+
+	if err != nil {
+		slog.Error("unable to answer callback query", "error", err)
+	}
+	return nil
+}
+
+func (bot *Bot) deleteTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
+	cq := ctx.CallbackQuery
+
+	key := strings.TrimPrefix(cq.Data, deletePrefix)
+	err := bot.teledger.DeleteTransaction(key)
+
+	if err != nil {
+		_, _ = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
+			ShowAlert: true,
+			Text: fmt.Sprintf("🛑️ Error!\n%s", err)  ,
+		})
+
+		return nil
+	}
+
+	_, err = bot.bot.DeleteMessage(cq.Message.GetChat().Id, cq.Message.GetMessageId(), nil)
+
+	if err != nil {
+		slog.Error("unable to edit message", "error", err)
+		_, _ = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
+			ShowAlert: true,
+			Text: fmt.Sprintf("Can't delete message: %v", err),
+		})
+		return nil
 	}
 
 	_, err = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
