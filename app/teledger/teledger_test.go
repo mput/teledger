@@ -138,8 +138,8 @@ commodity EUR
 ;; tid:2014-11-30 11:45:26.371 Sun
 ;; valid
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 `,
 			)
 
@@ -188,20 +188,20 @@ commodity EUR
 ;; tid:2014-11-30 11:45:26.111 Sun
 ;; valid
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 
 ;; tid:2014-11-30 11:45:26.371 Sun
 ;; valid
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 
 ;; tid:2014-11-30 11:45:26.371 Sun
 ;; valid
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 `
 
 
@@ -227,14 +227,14 @@ commodity EUR
 ;; tid:2014-11-30 11:45:26.371 Sun
 ;; valid
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 
 ;; tid:2014-11-30 11:45:26.371 Sun
 ;; valid
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 `,
 					r.Files["main.ledger"],
 				)
@@ -253,8 +253,8 @@ commodity EUR
 ;; tid:2014-11-30 11:45:26.371 Sun
 ;; valid
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 `,
 					r.Files["main.ledger"],
 				)
@@ -268,8 +268,8 @@ commodity EUR
 		t.Run("propose valid transaction, not free form explanation", func(t *testing.T) {
 			resp := tldgr.ProposeTransaction(`
 2014-11-30 * My tr
-    Assets:Cash  -10,00 EUR
-    Food  10,00 EUR
+    Assets:Cash  -10.00 EUR
+    Food  10.00 EUR
 `)
 			assert.Empty(t, resp.PendingKey)
 			assert.Equal(t, 0, resp.AttemptNumber)

@@ -25,13 +25,13 @@ func main() {
 
 	nbot, err := bot.NewBot(&opts)
 	if err != nil {
-		slog.Error("unable to create bot: %v", err)
+		slog.Error("unable to create bot", "err", err)
 	}
 
 	// TODO: handle signals
 	err = nbot.Start()
 	if err != nil {
-		slog.Error("unable to start bot: %v", err)
+		slog.Error("unable to start bot", "err", err)
 	}
 
 }

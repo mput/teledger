@@ -273,8 +273,8 @@ strict: true
 			`;; valid transaction
 ;; 22 multiple lines
 2014-11-12 * Tacos
-    Assets:Cash  -3.000,43 EUR
-    Food  3.000,43 EUR
+    Assets:Cash  -3,000.43 EUR
+    Food  3,000.43 EUR
 `,
 			resp.GeneratedTransaction.Format(true),
 		)
@@ -285,8 +285,8 @@ strict: true
 
 		resp := ledger.AddOrProposeTransaction(`
 2014-11-12 * Tacos
-    Assets:Cash  -2,43 EUR
-    Food  2,43 EUR
+    Assets:Cash  -2.43 EUR
+    Food  2.43 EUR
 `, 1)
 
 		assert.Nil(t, resp.GeneratedTransaction)

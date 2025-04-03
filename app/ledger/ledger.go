@@ -411,7 +411,7 @@ func (t *Transaction) Format(withComment bool) string {
 	res.WriteString(fmt.Sprintf("%s * %s\n", t.RealDateTime.Format("2006-01-02"), t.Description))
 	for _, p := range t.Postings {
 		// format float to 2 decimal places
-		vf := humanize.FormatFloat("#.###,##", p.Amount)
+		vf := humanize.FormatFloat("#,###.##", p.Amount)
 		res.WriteString(fmt.Sprintf("    %s  %s %s\n", p.Account, vf, p.Currency))
 
 	}
