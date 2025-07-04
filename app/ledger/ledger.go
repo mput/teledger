@@ -67,9 +67,9 @@ func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) 
 
 	var f func(ledReader io.ReadCloser, top bool)
 	f = func(ledReader io.ReadCloser, top bool) {
-		defer ledReader.Close()
+		defer func() { _ = ledReader.Close() }()
 		if top {
-			defer w.Close()
+			defer func() { _ = w.Close() }()
 		}
 
 		lcnt := 0
@@ -129,7 +129,7 @@ func (l *Ledger) executeWith(additional string, args ...string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("ledger temp dir creation error: %v", err)
 	}
-	defer os.RemoveAll(cmddir)
+	defer func() { _ = os.RemoveAll(cmddir) }()
 
 	cmd := exec.Command(ledgerBinary, fargs...)
 
@@ -198,7 +198,7 @@ func (l *Ledger) addTransaction(transaction string) error {
 		return fmt.Errorf("unable to open main ledger file: %v", err)
 	}
 	_, err = fmt.Fprintf(r, "\n%s", transaction)
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	if err != nil {
 		return fmt.Errorf("unable to write main ledger file: %v", err)
 	}
@@ -324,11 +324,6 @@ func (l *Ledger) validate() error {
 	return err
 }
 
-func (l *Ledger) validateWith(addition string) error {
-	_, err := l.executeWith(addition, "balance")
-	return err
-}
-
 func wrapIntoComment(s string) string {
 	lines := make([]string, 0)
 
@@ -370,7 +365,7 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 	}
 
 	err = l.validate()
-	r.Close()
+	_ = r.Close()
 	if err != nil {
 		return "", fmt.Errorf("ledger file become invalid after an attempt to add comment: %v", err)
 	}

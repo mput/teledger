@@ -81,10 +81,10 @@ func TestNewInMemoryRepo(t *testing.T) {
 		}
 
 		line := fmt.Sprintf(";; %s: line added by the Write File test", time.Now())
-		fmt.Fprintf(w, "\n%s", line)
+		_, _ = fmt.Fprintf(w, "\n%s", line)
 
 		require.False(t, repo.dirtyFiles["main.ledger"])
-		w.Close()
+		_ = w.Close()
 		require.True(t, repo.dirtyFiles["main.ledger"])
 
 		if !strings.HasSuffix(checkReadString(t, repo, "main.ledger"), line) {
