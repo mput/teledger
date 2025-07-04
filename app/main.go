@@ -37,9 +37,7 @@ func main() {
 		slog.Error("unable to create bot", "err", err)
 	}
 
-	// Setup HTTP handler
-	mux := http.NewServeMux()
-	mux.HandleFunc("/bot/miniapp", bot.MiniAppHandler)
+	mux := nbot.WebHandler()
 
 	// Check if we're in development mode and should use ngrok
 	if isDevelopmentMode() {
@@ -98,7 +96,6 @@ func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler) error {
 
 	ngrokURL := listener.URL().String()
 	slog.Info("ngrok tunnel established", "url", ngrokURL, "port", port)
-	slog.Info("MiniApp available at", "url", ngrokURL+"/bot/miniapp")
 
 	// Update bot's BaseURL to use ngrok URL
 	nbot.SetBaseURL(ngrokURL)

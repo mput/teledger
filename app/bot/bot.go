@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -73,6 +74,13 @@ func (bot *Bot) SetBaseURL(baseURL string) {
 	bot.opts.BaseURL = baseURL
 }
 
+// WebHandler returns a configured HTTP mux with bot routes
+func (bot *Bot) WebHandler() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc(MiniAppRoutePath, MiniAppHandler)
+	return mux
+}
+
 func (bot *Bot) Start() error {
 	defaultCommands := []gotgbot.BotCommand{
 		{Command: "reports", Description: "Show available reports"},
@@ -85,7 +93,7 @@ func (bot *Bot) Start() error {
 	slog.Info("commands has been set", "result", smcRes)
 
 	// Set the menu button to open the mini app (WebApp)
-	webAppUrl := bot.opts.BaseURL + "/bot/miniapp"
+	webAppUrl := bot.opts.BaseURL + MiniAppRoutePath
 	slog.Info("setting webapp menu button", "url", webAppUrl)
 	_, err = bot.bot.SetChatMenuButton(&gotgbot.SetChatMenuButtonOpts{
 		MenuButton: gotgbot.MenuButtonWebApp{
@@ -279,8 +287,9 @@ func isReportCallback(cb *gotgbot.CallbackQuery) bool {
 }
 
 const (
-	confirmPrefix = "cf:"
-	deletePrefix  = "rm:"
+	confirmPrefix    = "cf:"
+	deletePrefix     = "rm:"
+	MiniAppRoutePath = "/bot/miniapp"
 )
 
 func isConfirmCallback(cb *gotgbot.CallbackQuery) bool {
