@@ -63,7 +63,6 @@ func NewBot(opts *Opts) (*Bot, error) {
 		teledger: tel,
 		bot:      b,
 	}, nil
-
 }
 
 func (bot *Bot) Start() error {
@@ -141,7 +140,6 @@ func wrapUserResponse(next response, name string) handlers.Response {
 				"from", msg.From.Username,
 				"handler", name,
 			)
-
 		}
 		if resp != "" {
 			_, ierr := b.SendMessage(msg.Chat.Id, resp, opts)
@@ -171,7 +169,6 @@ func (bot *Bot) vesrion(_ *ext.Context) (string, *gotgbot.SendMessageOpts, error
 		nil
 }
 
-
 func (bot *Bot) comment(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, error) {
 	msg := ctx.EffectiveMessage
 	text := strings.TrimPrefix(msg.Text, "//")
@@ -183,13 +180,12 @@ func (bot *Bot) comment(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, err
 	}
 
 	comment, err := bot.teledger.AddComment(text)
-
 	if err != nil {
 		return fmt.Sprintf("Error: %v", err), nil, nil
 	}
 
 	return fmt.Sprintf("```\n%s\n```", comment), &gotgbot.SendMessageOpts{
-		ParseMode: "MarkdownV2",
+		ParseMode:           "MarkdownV2",
 		DisableNotification: true,
 	}, nil
 }
@@ -215,7 +211,7 @@ func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessa
 		inlineKeyboard = append(inlineKeyboard, []gotgbot.InlineKeyboardButton{
 			{
 				Text:         "✅ Confirm",
-				CallbackData: fmt.Sprintf("%s%s",confirmPrefix, key),
+				CallbackData: fmt.Sprintf("%s%s", confirmPrefix, key),
 			},
 		})
 	}
@@ -227,7 +223,6 @@ func (bot *Bot) proposeTransaction(ctx *ext.Context) (string, *gotgbot.SendMessa
 		ReplyMarkup: gotgbot.InlineKeyboardMarkup{
 			InlineKeyboard: inlineKeyboard,
 		},
-
 	}, nil
 }
 
@@ -246,7 +241,7 @@ func (bot *Bot) showAvailableReports(_ *ext.Context) (string, *gotgbot.SendMessa
 	}
 
 	opts := &gotgbot.SendMessageOpts{
-		ParseMode: "MarkdownV2",
+		ParseMode:           "MarkdownV2",
 		DisableNotification: true,
 		ReplyMarkup: gotgbot.InlineKeyboardMarkup{
 			InlineKeyboard: inlineKeyboard,
@@ -260,8 +255,10 @@ func isReportCallback(cb *gotgbot.CallbackQuery) bool {
 	return strings.HasPrefix(cb.Data, "report:")
 }
 
-const confirmPrefix = "cf:"
-const deletePrefix =  "rm:"
+const (
+	confirmPrefix = "cf:"
+	deletePrefix  = "rm:"
+)
 
 func isConfirmCallback(cb *gotgbot.CallbackQuery) bool {
 	return strings.HasPrefix(cb.Data, confirmPrefix)
@@ -276,17 +273,15 @@ func (bot *Bot) confirmTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 
 	_, _, err := bot.bot.EditMessageReplyMarkup(
 		&gotgbot.EditMessageReplyMarkupOpts{
-			MessageId: cq.Message.GetMessageId(),
-			ChatId: cq.Message.GetChat().Id,
+			MessageId:       cq.Message.GetMessageId(),
+			ChatId:          cq.Message.GetChat().Id,
 			InlineMessageId: cq.InlineMessageId,
-			ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+			ReplyMarkup:     gotgbot.InlineKeyboardMarkup{},
 		},
 	)
-
 	if err != nil {
 		slog.Error("unable to edit inline keyboard", "error", err)
 	}
-
 
 	key := strings.TrimPrefix(cq.Data, confirmPrefix)
 	pendTr, err := bot.teledger.ConfirmTransaction(key)
@@ -303,32 +298,31 @@ func (bot *Bot) confirmTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		_, _ = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
 			ShowAlert: true,
-			Text: fmt.Sprintf("🛑️ Error!\n%s", err)  ,
+			Text:      fmt.Sprintf("🛑️ Error!\n%s", err),
 		})
 
 		_, _, _ = bot.bot.EditMessageReplyMarkup(
 			&gotgbot.EditMessageReplyMarkupOpts{
-				MessageId: cq.Message.GetMessageId(),
-				ChatId: cq.Message.GetChat().Id,
+				MessageId:       cq.Message.GetMessageId(),
+				ChatId:          cq.Message.GetChat().Id,
 				InlineMessageId: cq.InlineMessageId,
-				ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+				ReplyMarkup:     gotgbot.InlineKeyboardMarkup{},
 			},
 		)
 
 		return nil
 	}
 
-
 	_, _, err = bot.bot.EditMessageText(
 		newMessageContent.String(),
 		&gotgbot.EditMessageTextOpts{
-			MessageId: cq.Message.GetMessageId(),
-			ChatId: cq.Message.GetChat().Id,
+			MessageId:       cq.Message.GetMessageId(),
+			ChatId:          cq.Message.GetChat().Id,
 			InlineMessageId: cq.InlineMessageId,
-			ParseMode: "HTML",
+			ParseMode:       "HTML",
 			ReplyMarkup: gotgbot.InlineKeyboardMarkup{
 				InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-					[]gotgbot.InlineKeyboardButton{
+					{
 						{
 							Text:         "🛑 Delete",
 							CallbackData: fmt.Sprint(deletePrefix, key),
@@ -338,7 +332,6 @@ func (bot *Bot) confirmTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 			},
 		},
 	)
-
 	if err != nil {
 		slog.Error("unable to edit message", "error", err)
 	}
@@ -346,7 +339,6 @@ func (bot *Bot) confirmTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 	_, err = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
 		Text: "✔️ confirmed",
 	})
-
 	if err != nil {
 		slog.Error("unable to answer callback query", "error", err)
 	}
@@ -358,23 +350,21 @@ func (bot *Bot) deleteTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 
 	key := strings.TrimPrefix(cq.Data, deletePrefix)
 	err := bot.teledger.DeleteTransaction(key)
-
 	if err != nil {
 		_, _ = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
 			ShowAlert: true,
-			Text: fmt.Sprintf("🛑️ Error!\n%s", err)  ,
+			Text:      fmt.Sprintf("🛑️ Error!\n%s", err),
 		})
 
 		return nil
 	}
 
 	_, err = bot.bot.DeleteMessage(cq.Message.GetChat().Id, cq.Message.GetMessageId(), nil)
-
 	if err != nil {
 		slog.Error("unable to edit message", "error", err)
 		_, _ = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
 			ShowAlert: true,
-			Text: fmt.Sprintf("Can't delete message: %v", err),
+			Text:      fmt.Sprintf("Can't delete message: %v", err),
 		})
 		return nil
 	}
@@ -382,7 +372,6 @@ func (bot *Bot) deleteTransaction(_ *gotgbot.Bot, ctx *ext.Context) error {
 	_, err = bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
 		Text: "✔️ confirmed",
 	})
-
 	if err != nil {
 		slog.Error("unable to answer callback query", "error", err)
 	}
@@ -394,20 +383,18 @@ func (bot *Bot) showReport(ctx *ext.Context) (string, *gotgbot.SendMessageOpts, 
 	_, err := bot.bot.AnswerCallbackQuery(cq.Id, &gotgbot.AnswerCallbackQueryOpts{
 		Text: "✔️",
 	})
-
 	if err != nil {
 		slog.Error("unable to answer callback query", "error", err)
 	}
 
 	reportTitle := strings.TrimPrefix(cq.Data, "report:")
 	report, err := bot.teledger.Report(reportTitle)
-
 	if err != nil {
 		return fmt.Sprintf("Error: %v", err), nil, nil
 	}
 
 	return fmt.Sprintf("```\n%s\n```", report), &gotgbot.SendMessageOpts{
-		ParseMode: "MarkdownV2",
+		ParseMode:           "MarkdownV2",
 		DisableNotification: true,
 	}, nil
 }

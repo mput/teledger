@@ -18,7 +18,7 @@ type Teledger struct {
 func NewTeledger(ldgr *ledger.Ledger) *Teledger {
 	m := make(map[string]*PendingTransaction)
 	return &Teledger{
-		Ledger: ldgr,
+		Ledger:                        ldgr,
 		WaitingToBeConfirmedResponses: &m,
 	}
 }
@@ -27,7 +27,6 @@ func NewTeledger(ldgr *ledger.Ledger) *Teledger {
 // The comment will be added at the end of the file, with a timestamp
 // and the template of the transaction at the end
 func (tel *Teledger) AddComment(comment string) (string, error) {
-
 	// TODO: move timezone to config
 	timezoneName := "GMT"
 	loc, err := time.LoadLocation(timezoneName)
@@ -77,7 +76,7 @@ func (tel *Teledger) Init() error {
 type PendingTransaction struct {
 	ledger.ProposeTransactionRespones
 	PendingKey string
-	Mu sync.Mutex
+	Mu         sync.Mutex
 }
 
 // Receive a short free-text description of a transaction
@@ -110,7 +109,6 @@ func (tel *Teledger) ConfirmTransaction(pendingKey string) (*PendingTransaction,
 	defer pendTr.Mu.Unlock()
 
 	err := tel.Ledger.AddTransactionWithID(pendTr.GeneratedTransaction.Format(true), pendingKey)
-
 	if err != nil {
 		return nil, err
 	}

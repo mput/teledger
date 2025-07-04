@@ -2,6 +2,9 @@ package ledger
 
 import (
 	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,10 +14,7 @@ import (
 	"text/template"
 	"time"
 
-	"bytes"
-	"context"
 	_ "embed"
-	"encoding/json"
 
 	"github.com/dustin/go-humanize"
 	"github.com/mput/teledger/app/repo"
@@ -107,12 +107,10 @@ func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) 
 	go f(ledgerFile, true)
 
 	return r, nil
-
 }
 
 func (l *Ledger) executeWith(additional string, args ...string) (string, error) {
 	r, err := resolveIncludesReader(l.repo, l.Config.MainFile)
-
 	if err != nil {
 		return "", fmt.Errorf("ledger file opening error: %v", err)
 	}
@@ -187,7 +185,6 @@ func (l *Ledger) addTransaction(transaction string) error {
 	}
 
 	balAfter, err := l.executeWith(transaction, "balance")
-
 	if err != nil {
 		return fmt.Errorf("invalid transaction: %v", err)
 	}
@@ -220,7 +217,6 @@ func (l *Ledger) AddTransaction(transaction string) error {
 	}
 
 	err = l.addTransaction(transaction)
-
 	if err != nil {
 		return err
 	}
@@ -234,8 +230,8 @@ func (l *Ledger) AddTransaction(transaction string) error {
 
 const transactionIDPrefix = ";; tid:"
 
-func (l *Ledger) AddTransactionWithID(transaction , id string) error {
-	return l.AddTransaction(fmt.Sprintf("%s%s\n%s",transactionIDPrefix, id, transaction))
+func (l *Ledger) AddTransactionWithID(transaction, id string) error {
+	return l.AddTransaction(fmt.Sprintf("%s%s\n%s", transactionIDPrefix, id, transaction))
 }
 
 func filterOutTransactionWithID(r io.Reader, id string) (content []byte, err error) {
@@ -247,14 +243,14 @@ func filterOutTransactionWithID(r io.Reader, id string) (content []byte, err err
 	for scanner.Scan() {
 		txt := scanner.Text()
 
-		if (afterMarker == 0 && txt == marker) {
+		if afterMarker == 0 && txt == marker {
 			afterMarker++
-			if len(content) > 0 && content[len(content) - 1] == '\n' {
-				content = content[:len(content) - 1]
+			if len(content) > 0 && content[len(content)-1] == '\n' {
+				content = content[:len(content)-1]
 			}
 			continue
 		}
-		if (afterMarker == 1 && txt == "") {
+		if afterMarker == 1 && txt == "" {
 			afterMarker++
 			content = append(content, '\n')
 			continue
@@ -272,7 +268,6 @@ func filterOutTransactionWithID(r io.Reader, id string) (content []byte, err err
 		return content, fmt.Errorf("no transaction with id '%s' was found", id)
 	}
 	return content, nil
-
 }
 
 func (l *Ledger) DeleteTransactionWithID(id string) error {
@@ -302,13 +297,11 @@ func (l *Ledger) DeleteTransactionWithID(id string) error {
 	}
 
 	_, err = f.Seek(0, 0)
-
 	if err != nil {
 		return err
 	}
 
 	_, err = f.Write(newContent)
-
 	if err != nil {
 		return err
 	}
@@ -372,7 +365,6 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 	}
 
 	_, err = fmt.Fprintf(r, "\n%s\n", res)
-
 	if err != nil {
 		return "", fmt.Errorf("unable to write main ledger file: %v", err)
 	}
@@ -386,7 +378,6 @@ func (l *Ledger) AddComment(comment string) (string, error) {
 	err = l.repo.CommitPush("New comment", "teledger", "teledger@example.com")
 	if err != nil {
 		return "", fmt.Errorf("unable to commit: %v", err)
-
 	}
 	return res, nil
 }
@@ -417,7 +408,6 @@ func (t *Transaction) Format(withComment bool) string {
 	}
 	return res.String()
 }
-
 
 func (t *Transaction) String() string {
 	return t.Format(false)
@@ -475,7 +465,6 @@ func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Tr
 			},
 		},
 	)
-
 	if err != nil {
 		fmt.Println("ChatCompletion error: ", err)
 		return Transaction{}, fmt.Errorf("chatCompletion error: %v", err)
@@ -598,13 +587,11 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 
 	// try to add for validation
 	err = l.addTransaction(trx.Format(false))
-
 	if err != nil {
 		return trx, fmt.Errorf("unable to validate transaction: %v", err)
 	}
 
 	return trx, nil
-
 }
 
 func parseConfig(r io.Reader, c *Config) error {
@@ -658,7 +645,7 @@ type ProposeTransactionRespones struct {
 	Error error
 	// Attempt from which the transaction was generated
 	AttemptNumber int
-	Committed      bool
+	Committed     bool
 }
 
 func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) ProposeTransactionRespones {

@@ -9,10 +9,9 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 )
 
-
 type Mock struct {
-	Files map[string]string
-	fs billy.Filesystem
+	Files  map[string]string
+	fs     billy.Filesystem
 	inited bool
 }
 
@@ -32,7 +31,6 @@ func (r *Mock) Init() error {
 		}
 
 		err = f.Close()
-
 		if err != nil {
 			return err
 		}
@@ -55,7 +53,6 @@ func (r *Mock) OpenFile(filename string, flag int, perm os.FileMode) (billy.File
 	return r.fs.OpenFile(filename, flag, perm)
 }
 
-
 func (r *Mock) Open(filename string) (billy.File, error) {
 	return r.OpenFile(filename, os.O_RDONLY, 0)
 }
@@ -64,15 +61,13 @@ func (r *Mock) OpenForAppend(filename string) (billy.File, error) {
 	return r.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0)
 }
 
-
 func (r *Mock) CommitPush(_, _, _ string) error {
-	for fname, _ := range r.Files {
+	for fname := range r.Files {
 		f, err := r.fs.Open(fname)
 		if err != nil {
 			return err
 		}
 		fc, err := io.ReadAll(f)
-
 		if err != nil {
 			return err
 		}
@@ -80,7 +75,6 @@ func (r *Mock) CommitPush(_, _, _ string) error {
 		r.Files[fname] = string(fc)
 
 		err = f.Close()
-
 		if err != nil {
 			return err
 		}

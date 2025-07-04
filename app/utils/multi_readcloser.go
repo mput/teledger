@@ -1,10 +1,12 @@
 package utils
 
 import "io"
+
 type multiReadCloser struct {
 	closers []io.Closer
 	reader  io.Reader
 }
+
 func (mc *multiReadCloser) Close() error {
 	var err error
 	for i := range mc.closers {
@@ -12,9 +14,11 @@ func (mc *multiReadCloser) Close() error {
 	}
 	return err
 }
+
 func (mc *multiReadCloser) Read(p []byte) (int, error) {
 	return mc.reader.Read(p)
 }
+
 func MultiReadCloser(readClosers ...io.ReadCloser) io.ReadCloser {
 	cs := make([]io.Closer, len(readClosers))
 	rs := make([]io.Reader, len(readClosers))

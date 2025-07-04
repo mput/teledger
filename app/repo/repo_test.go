@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func checkReadString (t *testing.T, repo Service, fp string) string {
+func checkReadString(t *testing.T, repo Service, fp string) string {
 	r, err := repo.Open(fp)
 	if err != nil {
 		t.Errorf("Unexpected error on file open: %v", err)
@@ -40,23 +40,21 @@ func TestNewInMemoryRepo(t *testing.T) {
 	repo := NewInMemoryRepo(gitURL, gitToken)
 
 	err := repo.Init()
-
 	if err != nil {
 		t.Fatalf("unable to init repo: %v", err)
 	}
 
 	t.Run("OpenReader", func(t *testing.T) {
-		if  checkReadString(t, repo, "main.ledger") == "" {
+		if checkReadString(t, repo, "main.ledger") == "" {
 			t.Fatal("Unexpected empty file.")
 		}
 
 		r, _ := repo.Open("./main.ledger")
 		d, _ := io.ReadAll(r)
 
-		if  len(d) == 0 {
+		if len(d) == 0 {
 			t.Fatal("Unexpected empty file for relative link.")
 		}
-
 
 		_, err = repo.Open("./nonexisting.ledger")
 
@@ -67,7 +65,6 @@ func TestNewInMemoryRepo(t *testing.T) {
 
 	t.Run("Write And Commit File", func(t *testing.T) {
 		w, err := repo.OpenForAppend("main.ledger")
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,8 +111,5 @@ func TestNewInMemoryRepo(t *testing.T) {
 			t.Fatal("Reader doesn't contains committed string")
 		}
 		newRepo.Free()
-
-
 	})
-
 }

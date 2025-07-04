@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-
 func TestTeledger_AddComment(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		initContent := `
@@ -43,10 +42,6 @@ func TestTeledger_AddComment(t *testing.T) {
 ;;  multiline
 ;; \d{4}-\d{2}-\d{2} \*
 `, content)
-
-
-
-
 	})
 }
 
@@ -73,7 +68,6 @@ strict: true
 		mockedTransactionGenerator := &ledger.TransactionGeneratorMock{
 			GenerateTransactionFunc: func(prmt ledger.PromptCtx) (mocktr ledger.Transaction, err error) {
 				dt, _ := time.Parse(time.RFC3339, "2014-11-30T11:45:26.371443Z")
-
 
 				switch prmt.UserInput {
 				case "valid":
@@ -102,10 +96,9 @@ strict: true
 			},
 		}
 
-
 		l := ledger.NewLedger(r, mockedTransactionGenerator)
 
-		tldgr :=  NewTeledger(l)
+		tldgr := NewTeledger(l)
 		resp := tldgr.ProposeTransaction("valid")
 		assert.NotEmpty(t, resp.PendingKey)
 		assert.Empty(t, resp.Error)
@@ -118,7 +111,7 @@ strict: true
 			(*tldgr.WaitingToBeConfirmedResponses)[resp.PendingKey].Mu.Unlock()
 		})
 
-		t.Run("Success Confirmation",  func(t *testing.T) {
+		t.Run("Success Confirmation", func(t *testing.T) {
 			_, err := tldgr.ConfirmTransaction(resp.PendingKey)
 			assert.Empty(t, err)
 
@@ -142,15 +135,12 @@ commodity EUR
     Food  10.00 EUR
 `,
 			)
-
 		})
 
-		t.Run("attempt to confirm for the second time",  func(t *testing.T) {
+		t.Run("attempt to confirm for the second time", func(t *testing.T) {
 			_, err := tldgr.ConfirmTransaction(resp.PendingKey)
 			assert.ErrorContains(t, err, "missing pending transaction")
-
 		})
-
 
 		t.Run("attempt to confirm with unknonw key", func(t *testing.T) {
 			_, err := tldgr.ConfirmTransaction("unk")
@@ -166,7 +156,6 @@ commodity EUR
 				initContent,
 				r.Files["main.ledger"],
 			)
-
 		})
 
 		t.Run("delete unknown transaction", func(t *testing.T) {
@@ -178,7 +167,6 @@ commodity EUR
 				initContent,
 				r.Files["main.ledger"],
 			)
-
 		})
 
 		t.Run("delete transaction corner cases", func(t *testing.T) {
@@ -204,7 +192,6 @@ commodity EUR
     Food  10.00 EUR
 `
 
-
 			r := &repo.Mock{
 				Files: map[string]string{"main.ledger": initCoreners},
 			}
@@ -216,7 +203,7 @@ commodity EUR
 			}
 
 			t.Run("transaction in the middle", func(t *testing.T) {
-				err :=tldgr.DeleteTransaction("2014-11-30 11:45:26.111 Sun")
+				err := tldgr.DeleteTransaction("2014-11-30 11:45:26.111 Sun")
 				assert.Empty(t, err)
 
 				assert.Equal(
@@ -238,11 +225,10 @@ commodity EUR
 `,
 					r.Files["main.ledger"],
 				)
-
 			})
 
 			t.Run("repeating transaction", func(t *testing.T) {
-				err :=tldgr.DeleteTransaction("2014-11-30 11:45:26.371 Sun")
+				err := tldgr.DeleteTransaction("2014-11-30 11:45:26.371 Sun")
 				assert.Empty(t, err)
 
 				assert.Equal(
@@ -258,11 +244,7 @@ commodity EUR
 `,
 					r.Files["main.ledger"],
 				)
-
 			})
-
-
-
 		})
 
 		t.Run("propose valid transaction, not free form explanation", func(t *testing.T) {
@@ -274,11 +256,6 @@ commodity EUR
 			assert.Empty(t, resp.PendingKey)
 			assert.Equal(t, 0, resp.AttemptNumber)
 			assert.Empty(t, resp.Error)
-
-
 		})
-
-
-
 	})
 }

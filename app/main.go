@@ -9,7 +9,6 @@ import (
 	"github.com/mput/teledger/app/bot"
 )
 
-
 // injected with ldflags
 var version = "dev"
 
@@ -33,5 +32,4 @@ func main() {
 	if err != nil {
 		slog.Error("unable to start bot", "err", err)
 	}
-
 }

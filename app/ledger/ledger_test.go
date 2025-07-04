@@ -1,10 +1,9 @@
 package ledger
 
 import (
+	"os"
 	"strings"
 	"testing"
-
-	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -13,7 +12,6 @@ import (
 )
 
 func TestLedger_Execute(t *testing.T) {
-
 	t.Run("one file", func(t *testing.T) {
 		t.Parallel()
 
@@ -26,7 +24,6 @@ func TestLedger_Execute(t *testing.T) {
 		ledger := NewLedger(&repo.Mock{Files: map[string]string{"main.ledger": testFile}}, nil)
 
 		res, err := ledger.Execute("bal")
-
 		if err != nil {
 			t.Fatalf("Error: %v", err)
 		}
@@ -40,7 +37,6 @@ func TestLedger_Execute(t *testing.T) {
 		if strings.TrimSpace(res) != expected {
 			t.Fatalf("Expected: '%s', got: '%s'", expected, res)
 		}
-
 	})
 
 	t.Run("ledger with includes", func(t *testing.T) {
@@ -71,7 +67,6 @@ commodity EUR
 		ledger := NewLedger(repomock, nil)
 
 		res, err := ledger.Execute("bal")
-
 		if err != nil {
 			t.Fatalf("Unexpected command execute error: %v", err)
 		}
@@ -85,9 +80,7 @@ commodity EUR
 		if strings.TrimSpace(res) != expected {
 			t.Fatalf("Expected: '%s', got: '%s'", expected, res)
 		}
-
 	})
-
 }
 
 func TestLedger_AddTransaction(t *testing.T) {
@@ -107,13 +100,11 @@ func TestLedger_AddTransaction(t *testing.T) {
   Assets:Cash  42.00 EUR
   Equity
 `)
-
 		if err != nil {
 			t.Fatalf("Error: %v", err)
 		}
 
 		res, err := ledger.Execute("bal")
-
 		if err != nil {
 			t.Fatalf("Error: %v", err)
 		}
@@ -153,7 +144,6 @@ dummy dummy
 		if err == nil {
 			t.Fatalf("Expected error")
 		}
-
 	})
 }
 
@@ -235,7 +225,6 @@ strict: true
 	)
 
 	t.Run("happy path", func(t *testing.T) {
-
 		resp := ledger.AddOrProposeTransaction("20 Taco Bell", 5)
 
 		assert.True(t, ledger.Config.StrictMode)
@@ -294,7 +283,6 @@ strict: true
 		assert.NoError(t, resp.Error)
 		assert.Equal(t, 0, len(mockedTransactionGenerator.calls.GenerateTransaction))
 		assert.Equal(t, 0, resp.AttemptNumber)
-
 	})
 
 	t.Run("validation error path", func(t *testing.T) {
@@ -304,9 +292,7 @@ strict: true
 		assert.ErrorContains(t, resp.Error, "Unknown account 'cash'")
 
 		assert.Equal(t, len(mockedTransactionGenerator.calls.GenerateTransaction), 1)
-
 	})
-
 }
 
 func TestWithRepo(t *testing.T) {
@@ -333,5 +319,4 @@ func TestWithRepo(t *testing.T) {
 	assert.True(t, ledger.Config.StrictMode)
 
 	assert.NotEmpty(t, res)
-
 }

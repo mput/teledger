@@ -4,18 +4,17 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"sync"
 )
-
 
 type Service interface {
 	// Pull fresh data from the remote repository
@@ -31,12 +30,12 @@ type Service interface {
 }
 
 type InMemoryRepo struct {
-	url    string
-	token  string
-	repo   *git.Repository
+	url        string
+	token      string
+	repo       *git.Repository
 	dirtyFiles map[string]bool
-	inited bool
-	initedMu sync.Mutex
+	inited     bool
+	initedMu   sync.Mutex
 }
 
 func NewInMemoryRepo(url, token string) *InMemoryRepo {
@@ -56,8 +55,8 @@ func (imr *InMemoryRepo) Init() error {
 			Username: "username",
 			Password: imr.token,
 		},
-		Depth: 1})
-
+		Depth: 1,
+	})
 	if err != nil {
 		return fmt.Errorf("init error, unable to clone %s: %v", imr.url, err)
 	}
@@ -65,7 +64,6 @@ func (imr *InMemoryRepo) Init() error {
 	ref, err := r.Head()
 	if err != nil {
 		return fmt.Errorf("init error: %v", err)
-
 	}
 	slog.Debug("repo cloned", "head", ref.Hash(), "url", imr.url)
 
@@ -85,14 +83,13 @@ func (imr *InMemoryRepo) Open(filename string) (billy.File, error) {
 	return imr.OpenFile(filename, os.O_RDONLY, 0)
 }
 
-
 func (imr *InMemoryRepo) OpenForAppend(filename string) (billy.File, error) {
 	return imr.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0)
 }
 
 type Closer struct {
 	billy.File
-	r *InMemoryRepo
+	r    *InMemoryRepo
 	path string
 }
 
@@ -111,20 +108,18 @@ func (imr *InMemoryRepo) OpenFile(file string, flag int, perm os.FileMode) (bill
 	}
 	f, err := wtr.Filesystem.OpenFile(file, flag, perm)
 	wc := Closer{
-		r: imr,
+		r:    imr,
 		path: file,
 		File: f,
 	}
 	return &wc, err
 }
 
-
 func (imr *InMemoryRepo) CommitPush(msg, name, email string) error {
 	if !imr.inited {
 		return fmt.Errorf("not initialized")
 	}
 	wtr, err := imr.repo.Worktree()
-
 	if err != nil {
 		return fmt.Errorf("worktree receiving error: %v", err)
 	}
@@ -144,7 +139,6 @@ func (imr *InMemoryRepo) CommitPush(msg, name, email string) error {
 			When:  time.Now(),
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("error while committing: %v", err)
 	}
@@ -154,7 +148,6 @@ func (imr *InMemoryRepo) CommitPush(msg, name, email string) error {
 			Password: imr.token,
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("error while pushing: %v", err)
 	}
@@ -164,7 +157,6 @@ func (imr *InMemoryRepo) CommitPush(msg, name, email string) error {
 
 func (imr *InMemoryRepo) resetPush(hash plumbing.Hash) error {
 	wtr, err := imr.repo.Worktree()
-
 	if err != nil {
 		return fmt.Errorf("worktree receiving error: %v", err)
 	}
@@ -173,7 +165,6 @@ func (imr *InMemoryRepo) resetPush(hash plumbing.Hash) error {
 		Commit: hash,
 		Mode:   git.HardReset,
 	})
-
 	if err != nil {
 		return fmt.Errorf("error while resetting: %v", err)
 	}
@@ -185,7 +176,6 @@ func (imr *InMemoryRepo) resetPush(hash plumbing.Hash) error {
 			Password: imr.token,
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("error while pushing reset: %v", err)
 	}
