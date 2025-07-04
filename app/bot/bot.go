@@ -34,7 +34,8 @@ type Opts struct {
 	// URL string `long:"url" env:"URL" required:"true" description:"bot url"`
 	Version string
 
-	BaseURL string `long:"base-url" env:"BASE_URL" required:"true" description:"Base URL of the bot (e.g., https://mybot.com)"`
+	BaseURL string `long:"base-url" env:"BASE_URL" description:"Base URL of the bot (e.g., https://mybot.com) - required for production, auto-set in development"`
+	Port    string `long:"port" env:"PORT" default:"8080" description:"Port to run the HTTP server on"`
 }
 
 type Bot struct {
@@ -67,6 +68,11 @@ func NewBot(opts *Opts) (*Bot, error) {
 	}, nil
 }
 
+// SetBaseURL updates the base URL (used for development mode with ngrok)
+func (bot *Bot) SetBaseURL(baseURL string) {
+	bot.opts.BaseURL = baseURL
+}
+
 func (bot *Bot) Start() error {
 	defaultCommands := []gotgbot.BotCommand{
 		{Command: "reports", Description: "Show available reports"},
@@ -80,9 +86,10 @@ func (bot *Bot) Start() error {
 
 	// Set the menu button to open the mini app (WebApp)
 	webAppUrl := bot.opts.BaseURL + "/bot/miniapp"
+	slog.Info("setting webapp menu button", "url", webAppUrl)
 	_, err = bot.bot.SetChatMenuButton(&gotgbot.SetChatMenuButtonOpts{
 		MenuButton: gotgbot.MenuButtonWebApp{
-			Text: "Open Teledger App",
+			Text: "Ledger",
 			WebApp: gotgbot.WebAppInfo{
 				Url: webAppUrl,
 			},
