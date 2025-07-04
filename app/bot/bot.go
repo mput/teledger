@@ -96,7 +96,7 @@ func (bot *Bot) Start() error {
 		},
 	})
 	if err != nil {
-		slog.Error("unable to set menu button for mini app", "err", err)
+		return fmt.Errorf("unable to set menu button for mini app: %v", err)
 	}
 
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
