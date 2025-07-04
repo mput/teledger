@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/jessevdk/go-flags"
@@ -26,6 +27,16 @@ func main() {
 	if err != nil {
 		slog.Error("unable to create bot", "err", err)
 	}
+
+	// Start the Mini App HTTP server in a goroutine
+	go func() {
+		http.HandleFunc("/bot/miniapp", bot.MiniAppHandler)
+		slog.Info("MiniApp HTTP server started on :8080 at /bot/miniapp")
+		err := http.ListenAndServe(":8080", nil)
+		if err != nil {
+			slog.Error("MiniApp HTTP server failed", "err", err)
+		}
+	}()
 
 	// TODO: handle signals
 	err = nbot.Start()

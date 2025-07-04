@@ -33,6 +33,8 @@ type Opts struct {
 
 	// URL string `long:"url" env:"URL" required:"true" description:"bot url"`
 	Version string
+
+	BaseURL string `long:"base-url" env:"BASE_URL" required:"true" description:"Base URL of the bot (e.g., https://mybot.com)"`
 }
 
 type Bot struct {
@@ -75,6 +77,20 @@ func (bot *Bot) Start() error {
 		return fmt.Errorf("unable to set commands: %v", err)
 	}
 	slog.Info("commands has been set", "result", smcRes)
+
+	// Set the menu button to open the mini app (WebApp)
+	webAppUrl := bot.opts.BaseURL + "/bot/miniapp"
+	_, err = bot.bot.SetChatMenuButton(&gotgbot.SetChatMenuButtonOpts{
+		MenuButton: gotgbot.MenuButtonWebApp{
+			Text: "Open Teledger App",
+			WebApp: gotgbot.WebAppInfo{
+				Url: webAppUrl,
+			},
+		},
+	})
+	if err != nil {
+		slog.Error("unable to set menu button for mini app", "err", err)
+	}
 
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
 		// If an error is returned by a handler, log it and continue going.
