@@ -11,6 +11,7 @@ require (
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.27.0
+	golang.ngrok.com/ngrok/v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -25,7 +26,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.ngrok.com/muxado/v2 v2.0.1 // indirect
-	golang.ngrok.com/ngrok/v2 v2.0.0 // indirect
 	golang.org/x/term v0.25.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 )

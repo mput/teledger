@@ -44,7 +44,7 @@ func main() {
 		// In development, start ngrok first to get the URL, then start bot
 		ngrokReady := make(chan error, 1)
 		go func() {
-			ngrokReady <- startNgrokServer(opts.Port, nbot, mux)
+			ngrokReady <- startNgrokServer(opts.Port, nbot, mux, opts.BaseURL)
 		}()
 
 		// Wait for ngrok to be ready or fail
@@ -73,7 +73,7 @@ func isDevelopmentMode() bool {
 }
 
 // startNgrokServer starts the HTTP server with ngrok tunnel
-func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler) error {
+func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler, baseURL string) error {
 	ctx := context.Background()
 
 	// Get ngrok authtoken from environment
@@ -88,8 +88,17 @@ func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler) error {
 		return fmt.Errorf("failed to create ngrok agent: %w", err)
 	}
 
-	// Create listener using the agent
-	listener, err := agent.Listen(ctx)
+	// Create listener using the agent with optional domain
+	var listener ngrok.EndpointListener
+	if baseURL != "" {
+		// Extract domain from BASE_URL (remove protocol if present)
+		domain := strings.TrimPrefix(strings.TrimPrefix(baseURL, "https://"), "http://")
+		slog.Info("Starting ngrok with custom domain", "domain", domain)
+		listener, err = agent.Listen(ctx, ngrok.WithURL(domain))
+	} else {
+		listener, err = agent.Listen(ctx)
+	}
+	
 	if err != nil {
 		return fmt.Errorf("failed to create ngrok listener: %w", err)
 	}
