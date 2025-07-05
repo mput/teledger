@@ -7,9 +7,6 @@ test:
 format:
 	gofumpt -w .
 
-format-check:
-	gofumpt -d .
-
 lint:
 	golangci-lint run
 

@@ -26,7 +26,7 @@ func main() {
 	})
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
-	
+
 	opts := bot.Opts{}
 	opts.Version = version
 	_, err := flags.Parse(&opts)

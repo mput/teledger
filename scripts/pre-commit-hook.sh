@@ -26,7 +26,7 @@ if [ -n "$staged_go_files" ]; then
     format_issues=""
     for file in $staged_go_files; do
         if [ -f "$file" ]; then
-            if ! gofumpt -d "$file" > /dev/null 2>&1; then
+            if gofumpt -d "$file" | grep -q .; then
                 format_issues="$format_issues $file"
             fi
         fi
