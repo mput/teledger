@@ -65,7 +65,7 @@ func (imr *InMemoryRepo) Init() error {
 	if err != nil {
 		return fmt.Errorf("init error: %v", err)
 	}
-	slog.Debug("repo cloned", "head", ref.Hash(), "url", imr.url)
+	slog.Debug("Git repository cloned", "head", ref.Hash(), "url", imr.url)
 
 	imr.repo = r
 	imr.dirtyFiles = make(map[string]bool)

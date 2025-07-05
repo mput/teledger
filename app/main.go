@@ -27,24 +27,26 @@ func main() {
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 	
-	fmt.Printf("teledger v:%s\n", version)
 	opts := bot.Opts{}
 	opts.Version = version
 	_, err := flags.Parse(&opts)
 	if err != nil {
-		fmt.Printf("[ERROR] %v", err)
+		slog.Error("flag parsing failed", "error", err)
 		os.Exit(1)
 	}
 
+	slog.Info("teledger started", "version", version, "port", opts.Port, "dev_mode", isDevelopmentMode(), "base_url", opts.BaseURL, "github_repo", opts.Github.URL)
+
 	// Validate BaseURL is provided in production mode
 	if !isDevelopmentMode() && opts.BaseURL == "" {
-		fmt.Printf("[ERROR] BASE_URL is required in production mode")
+		slog.Error("BASE_URL is required in production mode")
 		os.Exit(1)
 	}
 
 	nbot, err := bot.NewBot(&opts)
 	if err != nil {
-		slog.Error("unable to create bot", "err", err)
+		slog.Error("unable to create bot", "error", err)
+		os.Exit(1)
 	}
 
 	mux := nbot.WebHandler()
@@ -59,7 +61,7 @@ func main() {
 
 		// Wait for ngrok to be ready or fail
 		if err := <-ngrokReady; err != nil {
-			slog.Error("failed to start ngrok server", "err", err)
+			slog.Error("failed to start ngrok server", "error", err)
 			os.Exit(1)
 		}
 	} else {
@@ -72,7 +74,8 @@ func main() {
 	// TODO: handle signals
 	err = nbot.Start()
 	if err != nil {
-		slog.Error("unable to start bot", "err", err)
+		slog.Error("unable to start bot", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -103,7 +106,7 @@ func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler, baseURL 
 	if baseURL != "" {
 		// Extract domain from BASE_URL (remove protocol if present)
 		domain := strings.TrimPrefix(strings.TrimPrefix(baseURL, "https://"), "http://")
-		slog.Info("Starting ngrok with custom domain", "domain", domain)
+		slog.Info("starting ngrok with custom domain", "domain", domain)
 		listener, err = agent.Listen(ctx, ngrok.WithURL(domain))
 	} else {
 		listener, err = agent.Listen(ctx)
@@ -128,7 +131,7 @@ func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler, baseURL 
 		}
 		err := server.Serve(listener)
 		if err != nil {
-			slog.Error("ngrok HTTP server failed", "err", err)
+			slog.Error("ngrok HTTP server failed", "error", err)
 		}
 	}()
 
@@ -146,6 +149,6 @@ func startRegularServer(port string, handler http.Handler) {
 	}
 	err := server.ListenAndServe()
 	if err != nil {
-		slog.Error("HTTP server failed", "err", err)
+		slog.Error("HTTP server failed", "error", err)
 	}
 }

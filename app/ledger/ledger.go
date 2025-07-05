@@ -101,7 +101,7 @@ func resolveIncludesReader(rs repo.Service, file string) (io.ReadCloser, error) 
 			w.CloseWithError(fmt.Errorf("unable to read ledger file: %v", err))
 			return
 		}
-		slog.Debug("finish ledger file read", "file", file, "top", top, "lines", lcnt)
+		slog.Debug("ledger file processed", "file", file, "top", top, "lines", lcnt)
 	}
 
 	go f(ledgerFile, true)
@@ -461,7 +461,7 @@ func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Tr
 		},
 	)
 	if err != nil {
-		fmt.Println("ChatCompletion error: ", err)
+		slog.Error("failed to generate transaction with OpenAI", "error", err)
 		return Transaction{}, fmt.Errorf("chatCompletion error: %v", err)
 	}
 
@@ -592,7 +592,7 @@ func (l *Ledger) proposeTransaction(userInput string) (Transaction, error) {
 func parseConfig(r io.Reader, c *Config) error {
 	err := yaml.NewDecoder(r).Decode(c)
 	if err != nil {
-		slog.Warn("error decoding config file", "error", err)
+		slog.Warn("failed to decode config file", "error", err)
 		return err
 	}
 	return nil
@@ -610,7 +610,7 @@ func (l *Ledger) setConfig() error {
 			return err
 		}
 	} else if !os.IsNotExist(err) {
-		fmt.Println("unable to open config file", "error", err)
+		slog.Warn("unable to open config file", "error", err)
 		return err
 	}
 	// set defaults:
@@ -690,7 +690,7 @@ func (l *Ledger) AddOrProposeTransaction(userInput string, attempts int) Propose
 
 	for i := 1; i <= attempts; i++ {
 		if i > 1 {
-			slog.Warn("retrying transaction generation", "attempt", i)
+			slog.Warn("retrying OpenAI transaction generation", "attempt", i)
 		}
 		tr, addErr = l.proposeTransaction(userInput)
 		resp.Error = addErr

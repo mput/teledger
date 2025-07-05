@@ -90,11 +90,11 @@ func (bot *Bot) Start() error {
 	if err != nil {
 		return fmt.Errorf("unable to set commands: %v", err)
 	}
-	slog.Info("commands has been set", "result", smcRes)
+	slog.Info("Telegram commands set", "result", smcRes)
 
 	// Set the menu button to open the mini app (WebApp)
 	webAppURL := bot.opts.BaseURL + MiniAppRoutePath
-	slog.Info("setting webapp menu button", "url", webAppURL)
+	slog.Info("setting WebApp menu", "url", webAppURL)
 	_, err = bot.bot.SetChatMenuButton(&gotgbot.SetChatMenuButtonOpts{
 		MenuButton: gotgbot.MenuButtonWebApp{
 			Text: "Ledger",
@@ -143,7 +143,7 @@ func (bot *Bot) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to start polling: %v", err)
 	}
-	slog.Info("bot has been started", "bot-name", bot.bot.Username)
+	slog.Info("Telegram bot started", "bot-name", bot.bot.Username)
 	updater.Idle()
 
 	return nil
