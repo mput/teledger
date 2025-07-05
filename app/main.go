@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jessevdk/go-flags"
+	"github.com/lmittmann/tint"
 	"github.com/mput/teledger/app/bot"
 	"golang.ngrok.com/ngrok/v2"
 )
@@ -18,6 +19,14 @@ import (
 var version = "dev"
 
 func main() {
+	// Initialize colorful logging
+	handler := tint.NewHandler(os.Stderr, &tint.Options{
+		Level:      slog.LevelDebug,
+		TimeFormat: "02.01.2006 15:04:05",
+	})
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+	
 	fmt.Printf("teledger v:%s\n", version)
 	opts := bot.Opts{}
 	opts.Version = version

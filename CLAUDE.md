@@ -90,3 +90,6 @@ go test -v ./...
 - Uses standard Go testing with `testify` for assertions
 - Mock implementations available for repository operations
 - Test environment configured via `.env.test`
+
+### Known Behaviors
+- `make start` starts web server, so it never finishes execution
