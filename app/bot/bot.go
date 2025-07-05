@@ -93,13 +93,13 @@ func (bot *Bot) Start() error {
 	slog.Info("commands has been set", "result", smcRes)
 
 	// Set the menu button to open the mini app (WebApp)
-	webAppUrl := bot.opts.BaseURL + MiniAppRoutePath
-	slog.Info("setting webapp menu button", "url", webAppUrl)
+	webAppURL := bot.opts.BaseURL + MiniAppRoutePath
+	slog.Info("setting webapp menu button", "url", webAppURL)
 	_, err = bot.bot.SetChatMenuButton(&gotgbot.SetChatMenuButtonOpts{
 		MenuButton: gotgbot.MenuButtonWebApp{
 			Text: "Ledger",
 			WebApp: gotgbot.WebAppInfo{
-				Url: webAppUrl,
+				Url: webAppURL,
 			},
 		},
 	})

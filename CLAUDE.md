@@ -32,6 +32,11 @@ go test -v ./...
   - `OPENAI_TOKEN`: OpenAI API token
   - `BASE_URL`: Base URL of the bot service
 
+### Development Workflow
+- Use `make lint` to do linting
+- Before commit always do a `make format`
+- Do the commit message short. before commit, ask me if I like the commit message.
+
 ## Architecture Overview
 
 ### Core Components

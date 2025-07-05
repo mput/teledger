@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/mput/teledger/app/bot"
@@ -69,7 +70,7 @@ func main() {
 // isDevelopmentMode checks if we're running in development mode
 func isDevelopmentMode() bool {
 	devMode := os.Getenv("DEV_MODE")
-	return strings.ToLower(devMode) == "true"
+	return strings.EqualFold(devMode, "true")
 }
 
 // startNgrokServer starts the HTTP server with ngrok tunnel
@@ -98,7 +99,7 @@ func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler, baseURL 
 	} else {
 		listener, err = agent.Listen(ctx)
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create ngrok listener: %w", err)
 	}
@@ -111,7 +112,12 @@ func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler, baseURL 
 
 	// ngrok is ready, start serving (this will block)
 	go func() {
-		err := http.Serve(listener, handler)
+		server := &http.Server{
+			Handler:      handler,
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 15 * time.Second,
+		}
+		err := server.Serve(listener)
 		if err != nil {
 			slog.Error("ngrok HTTP server failed", "err", err)
 		}
@@ -123,7 +129,13 @@ func startNgrokServer(port string, nbot *bot.Bot, handler http.Handler, baseURL 
 // startRegularServer starts the HTTP server on localhost
 func startRegularServer(port string, handler http.Handler) {
 	slog.Info("HTTP server started", "port", port)
-	err := http.ListenAndServe(":"+port, handler)
+	server := &http.Server{
+		Addr:         ":" + port,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
 		slog.Error("HTTP server failed", "err", err)
 	}
