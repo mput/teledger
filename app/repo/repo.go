@@ -32,16 +32,18 @@ type Service interface {
 type InMemoryRepo struct {
 	url        string
 	token      string
+	branch     string
 	repo       *git.Repository
 	dirtyFiles map[string]bool
 	inited     bool
 	initedMu   sync.Mutex
 }
 
-func NewInMemoryRepo(url, token string) *InMemoryRepo {
+func NewInMemoryRepo(url, token, branch string) *InMemoryRepo {
 	return &InMemoryRepo{
 		url:    url,
 		token:  token,
+		branch: branch,
 		inited: false,
 	}
 }
@@ -49,14 +51,22 @@ func NewInMemoryRepo(url, token string) *InMemoryRepo {
 func (imr *InMemoryRepo) Init() error {
 	imr.initedMu.Lock()
 	fs := memfs.New()
-	r, err := git.Clone(memory.NewStorage(), fs, &git.CloneOptions{
+
+	cloneOptions := &git.CloneOptions{
 		URL: imr.url,
 		Auth: &http.BasicAuth{
 			Username: "username",
 			Password: imr.token,
 		},
 		Depth: 1,
-	})
+	}
+
+	// Set specific branch if provided
+	if imr.branch != "" {
+		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(imr.branch)
+	}
+
+	r, err := git.Clone(memory.NewStorage(), fs, cloneOptions)
 	if err != nil {
 		return fmt.Errorf("init error, unable to clone %s: %v", imr.url, err)
 	}
@@ -65,7 +75,8 @@ func (imr *InMemoryRepo) Init() error {
 	if err != nil {
 		return fmt.Errorf("init error: %v", err)
 	}
-	slog.Debug("Git repository cloned", "head", ref.Hash(), "url", imr.url)
+
+	slog.Debug("Git repository cloned", "head", ref.Hash(), "url", imr.url, "branch", imr.branch)
 
 	imr.repo = r
 	imr.dirtyFiles = make(map[string]bool)

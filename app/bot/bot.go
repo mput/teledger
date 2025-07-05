@@ -24,8 +24,9 @@ type Opts struct {
 	} `group:"telegram" namespace:"telegram" env-namespace:"TELEGRAM"`
 
 	Github struct {
-		URL   string `long:"url" env:"URL" required:"true" description:"github repo url"`
-		Token string `long:"token" env:"TOKEN" required:"true" description:"fine-grained personal access tokens for repo with RW Contents scope"`
+		URL    string `long:"url" env:"URL" required:"true" description:"github repo url"`
+		Token  string `long:"token" env:"TOKEN" required:"true" description:"fine-grained personal access tokens for repo with RW Contents scope"`
+		Branch string `long:"branch" env:"BRANCH" description:"git branch to clone (optional, defaults to repository default branch)"`
 	} `group:"github" namespace:"github" env-namespace:"GITHUB"`
 
 	OpenAI struct {
@@ -51,7 +52,9 @@ func NewBot(opts *Opts) (*Bot, error) {
 		return nil, fmt.Errorf("unable to create bot: %v", err)
 	}
 
-	rs := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token)
+	slog.Debug("Initializing bot with repository", "repo", opts.Github.URL, "branch", opts.Github.Branch)
+
+	rs := repo.NewInMemoryRepo(opts.Github.URL, opts.Github.Token, opts.Github.Branch)
 	llmGenerator := ledger.NewOpenAITransactionGenerator(opts.OpenAI.Token)
 
 	ldgr := ledger.NewLedger(rs, llmGenerator)

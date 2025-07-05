@@ -35,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("teledger started", "version", version, "port", opts.Port, "dev_mode", isDevelopmentMode(), "base_url", opts.BaseURL, "github_repo", opts.Github.URL)
+	slog.Info("teledger started", "version", version, "port", opts.Port, "dev_mode", isDevelopmentMode(), "base_url", opts.BaseURL, "github_repo", opts.Github.URL, "github_branch", opts.Github.Branch)
 
 	// Validate BaseURL is provided in production mode
 	if !isDevelopmentMode() && opts.BaseURL == "" {

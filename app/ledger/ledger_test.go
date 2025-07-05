@@ -308,7 +308,9 @@ func TestWithRepo(t *testing.T) {
 		t.Fatal("GIT_ACCESS_TOKEN is not set")
 	}
 
-	inmemrepo := repo.NewInMemoryRepo(gitURL, gitToken)
+	gitBranch := os.Getenv("GITHUB_BRANCH")
+
+	inmemrepo := repo.NewInMemoryRepo(gitURL, gitToken, gitBranch)
 
 	ledger := NewLedger(inmemrepo, nil)
 

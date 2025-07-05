@@ -37,7 +37,9 @@ func TestNewInMemoryRepo(t *testing.T) {
 		t.Fatal("GIT_ACCESS_TOKEN is not set")
 	}
 
-	repo := NewInMemoryRepo(gitURL, gitToken)
+	gitBranch := os.Getenv("GITHUB_BRANCH")
+
+	repo := NewInMemoryRepo(gitURL, gitToken, gitBranch)
 
 	err := repo.Init()
 	if err != nil {
@@ -104,7 +106,7 @@ func TestNewInMemoryRepo(t *testing.T) {
 			}
 		})
 
-		newRepo := NewInMemoryRepo(gitURL, gitToken)
+		newRepo := NewInMemoryRepo(gitURL, gitToken, gitBranch)
 		err = newRepo.Init()
 
 		if !strings.HasSuffix(checkReadString(t, newRepo, "main.ledger"), line) {
@@ -112,4 +114,32 @@ func TestNewInMemoryRepo(t *testing.T) {
 		}
 		newRepo.Free()
 	})
+}
+
+func TestNewInMemoryRepo_NonExistingBranch(t *testing.T) {
+	_ = godotenv.Load("../../.env.dev")
+
+	gitURL := os.Getenv("GITHUB_URL")
+	if gitURL == "" {
+		t.Fatal("GIT_URL is not set")
+	}
+
+	gitToken := os.Getenv("GITHUB_TOKEN")
+	if gitToken == "" {
+		t.Fatal("GIT_ACCESS_TOKEN is not set")
+	}
+
+	// Test with a non-existing branch
+	repo := NewInMemoryRepo(gitURL, gitToken, "non-existing-branch-12345")
+
+	err := repo.Init()
+	if err == nil {
+		t.Fatal("expected error when cloning non-existing branch, but got none")
+	}
+
+	// Check that the error message contains information about the branch
+	if !strings.Contains(err.Error(), "non-existing-branch-12345") && !strings.Contains(err.Error(), "reference not found") {
+		t.Logf("Error message: %v", err)
+		t.Fatal("expected error to mention the branch name or reference not found")
+	}
 }
