@@ -37,6 +37,11 @@ go test -v ./...
 - Before commit always do a `make format`
 - Do the commit message short. before commit, ask me if I like the commit message.
 
+### Git Hooks
+- Pre-commit hook automatically runs linting and formatting checks
+- To install hooks on a new clone: `make install-hooks`
+- Hook script is version controlled in `scripts/pre-commit-hook.sh`
+
 ## Architecture Overview
 
 ### Core Components

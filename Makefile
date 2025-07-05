@@ -4,10 +4,18 @@ start:
 test:
 	. ./.env.test && go test -v ./...
 
-fmt:
+format:
 	gofumpt -w .
+
+format-check:
+	gofumpt -d .
 
 lint:
 	golangci-lint run
 
-format: fmt lint
+install-hooks:
+	chmod +x scripts/pre-commit-hook.sh
+	cp scripts/pre-commit-hook.sh .git/hooks/pre-commit
+	echo "#!/bin/bash" > .git/hooks/pre-commit
+	echo "./scripts/pre-commit-hook.sh" >> .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
