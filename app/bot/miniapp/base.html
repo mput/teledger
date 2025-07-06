@@ -1,0 +1,65 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{block "title" .}}Teledger Mini App{{end}}</title>
+    
+    <!-- Telegram Web App Script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configure Tailwind to use Telegram theme colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'tg-theme-bg': 'var(--tg-theme-bg-color)',
+                        'tg-theme-text': 'var(--tg-theme-text-color)',
+                        'tg-theme-hint': 'var(--tg-theme-hint-color)',
+                        'tg-theme-link': 'var(--tg-theme-link-color)',
+                        'tg-theme-button': 'var(--tg-theme-button-color)',
+                        'tg-theme-button-text': 'var(--tg-theme-button-text-color)',
+                        'tg-theme-secondary-bg': 'var(--tg-theme-secondary-bg-color)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Use Telegram theme colors as CSS variables */
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #999999;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f1f1f1;
+        }
+    </style>
+    {{block "styles" .}}{{end}}
+</head>
+<body class="bg-tg-theme-bg text-tg-theme-text">
+    {{template "content" .}}
+    
+    <script>
+        // Initialize Telegram Web App if available
+        if (window.Telegram?.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+    </script>
+    
+    {{block "body_scripts" .}}{{end}}
+</body>
+</html>
+{{end}}

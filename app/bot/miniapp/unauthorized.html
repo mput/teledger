@@ -1,0 +1,15 @@
+{{define "content"}}
+    <div class="container mx-auto px-4 py-8 max-w-md">
+        <div class="text-center">
+            <h1 class="text-3xl font-bold mb-4">Authentication Required</h1>
+            <p class="text-tg-theme-hint mb-8">Please open this page through Telegram to access the Mini App.</p>
+        </div>
+        
+        <form id="tma-auth"
+              hx-post="/auth"
+              hx-trigger="load"
+              hx-swap="none"
+              hx-vals='js:{initData: Telegram?.WebApp?.initData ?? ""}'>
+        </form>
+    </div>
+{{end}}
