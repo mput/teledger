@@ -1,12 +1,15 @@
 package bot
 
 import (
-	"fmt"
+	_ "embed"
 	"net/http"
 )
 
-// MiniAppHandler serves a simple helloworld HTML page for the Telegram Mini App.
+//go:embed miniapp/index.html
+var miniAppHTML []byte
+
+// MiniAppHandler serves the Telegram Mini App HTML page.
 func MiniAppHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = fmt.Fprint(w, `<!DOCTYPE html><html><head><title>Hello</title></head><body><h1>hello world!</h1></body></html>`)
+	_, _ = w.Write(miniAppHTML)
 }

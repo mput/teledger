@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teledger Mini App</title>
+    
+    <!-- Telegram Web App Script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configure Tailwind to use Telegram theme colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'tg-theme-bg': 'var(--tg-theme-bg-color)',
+                        'tg-theme-text': 'var(--tg-theme-text-color)',
+                        'tg-theme-hint': 'var(--tg-theme-hint-color)',
+                        'tg-theme-link': 'var(--tg-theme-link-color)',
+                        'tg-theme-button': 'var(--tg-theme-button-color)',
+                        'tg-theme-button-text': 'var(--tg-theme-button-text-color)',
+                        'tg-theme-secondary-bg': 'var(--tg-theme-secondary-bg-color)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Use Telegram theme colors as CSS variables */
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #999999;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f1f1f1;
+        }
+    </style>
+</head>
+<body class="bg-tg-theme-bg text-tg-theme-text">
+    <div class="container mx-auto px-4 py-8 max-w-md">
+        <h1 class="text-3xl font-bold text-center mb-8">Hello World!</h1>
+        
+        <div class="bg-tg-theme-secondary-bg rounded-lg p-6 shadow-sm">
+            <p class="text-center text-tg-theme-hint">Welcome to Teledger Mini App</p>
+        </div>
+        
+        <button class="w-full mt-6 bg-tg-theme-button text-tg-theme-button-text py-3 px-6 rounded-lg font-medium hover:opacity-90 transition-opacity">
+            Get Started
+        </button>
+    </div>
+    
+    <script>
+        // Initialize Telegram Web App
+        Telegram.WebApp.ready();
+        
+        // Expand the web app to full height
+        Telegram.WebApp.expand();
+        
+        // Log some debug info
+        console.log('Telegram Web App initialized');
+        console.log('Theme params:', Telegram.WebApp.themeParams);
+        console.log('Init data:', Telegram.WebApp.initData);
+    </script>
+</body>
+</html>
