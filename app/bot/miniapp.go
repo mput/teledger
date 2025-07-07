@@ -6,6 +6,10 @@ import (
 	"net/http"
 )
 
+const (
+	MiniAppRoutePath = "/bot/miniapp"
+)
+
 //go:embed miniapp/base.html
 var baseTemplateContent string
 
@@ -15,10 +19,14 @@ var indexTemplateContent string
 //go:embed miniapp/unauthorized.html
 var unauthorizedTemplateContent string
 
+//go:embed miniapp/statistics.html
+var statisticsTemplateContent string
+
 // Pre-parsed templates
 var (
 	indexTemplate        = template.Must(template.New("index-page").Parse(baseTemplateContent + indexTemplateContent))
 	unauthorizedTemplate = template.Must(template.New("unauthorized-page").Parse(baseTemplateContent + unauthorizedTemplateContent))
+	statisticsTemplate   = template.Must(template.New("statistics-page").Parse(baseTemplateContent + statisticsTemplateContent))
 )
 
 // MiniAppHandler serves the Telegram Mini App HTML page.
@@ -40,4 +48,21 @@ func UnauthorizedHandler(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+// StatisticsHandler serves the statistics page
+func StatisticsHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	if err := statisticsTemplate.Execute(w, nil); err != nil {
+		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (bot *Bot) NewMiniAppMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc(MiniAppRoutePath, MiniAppHandler)
+	mux.HandleFunc(MiniAppRoutePath+"/statistics", StatisticsHandler)
+	return mux
 }

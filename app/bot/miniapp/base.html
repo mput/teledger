@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{block "title" .}}Teledger Mini App{{end}}</title>
+    <title>{{template "title" .}}</title>
     
     <!-- Telegram Web App Script -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -47,7 +47,7 @@
     </style>
     {{block "styles" .}}{{end}}
 </head>
-<body class="bg-tg-theme-bg text-tg-theme-text">
+<body class="bg-tg-theme-bg text-tg-theme-text" hx-boost="true">
     {{template "content" .}}
     
     <script>

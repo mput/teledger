@@ -1,0 +1,83 @@
+{{define "title"}}Teledger - Statistics{{end}}
+
+{{define "content"}}
+    <div class="container mx-auto px-4 py-8 max-w-md">
+        <h1 class="text-3xl font-bold text-center mb-8">Statistics</h1>
+        
+        <div class="space-y-4">
+            <div class="bg-tg-theme-secondary-bg rounded-lg p-6 shadow-sm">
+                <h3 class="text-lg font-semibold mb-3">Transaction Summary</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">Total Transactions:</span>
+                        <span class="font-medium">245</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">This Month:</span>
+                        <span class="font-medium">18</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">This Week:</span>
+                        <span class="font-medium">5</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-tg-theme-secondary-bg rounded-lg p-6 shadow-sm">
+                <h3 class="text-lg font-semibold mb-3">Balance Overview</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">Total Assets:</span>
+                        <span class="font-medium text-green-600">$15,432.50</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">Total Expenses:</span>
+                        <span class="font-medium text-red-600">$3,245.75</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">Net Worth:</span>
+                        <span class="font-medium">$12,186.75</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-tg-theme-secondary-bg rounded-lg p-6 shadow-sm">
+                <h3 class="text-lg font-semibold mb-3">Top Categories</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">Food & Dining:</span>
+                        <span class="font-medium">$1,245.30</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">Transportation:</span>
+                        <span class="font-medium">$845.50</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-tg-theme-hint">Entertainment:</span>
+                        <span class="font-medium">$420.75</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-8 flex gap-3">
+            <a href="/bot/miniapp" class="flex-1 bg-tg-theme-button text-tg-theme-button-text py-3 px-6 rounded-lg font-medium hover:opacity-90 transition-opacity text-center">
+                Back to Home
+            </a>
+            <button class="flex-1 bg-tg-theme-secondary-bg text-tg-theme-text py-3 px-6 rounded-lg font-medium hover:opacity-90 transition-opacity">
+                Refresh
+            </button>
+        </div>
+    </div>
+{{end}}
+
+{{define "body_scripts"}}
+    <script>
+        console.log("Statistics page loaded");
+        
+        // Refresh button functionality
+        document.querySelector('button').addEventListener('click', function() {
+            location.reload();
+        });
+    </script>
+{{end}}

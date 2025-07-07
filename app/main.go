@@ -49,7 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mux := nbot.WebHandler()
+	mux := nbot.NewMiniAppMux()
 
 	// Check if we're in development mode and should use ngrok
 	if isDevelopmentMode() {

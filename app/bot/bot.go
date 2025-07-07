@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
@@ -75,13 +74,6 @@ func NewBot(opts *Opts) (*Bot, error) {
 // SetBaseURL updates the base URL (used for development mode with ngrok)
 func (bot *Bot) SetBaseURL(baseURL string) {
 	bot.opts.BaseURL = baseURL
-}
-
-// WebHandler returns a configured HTTP mux with bot routes
-func (bot *Bot) WebHandler() *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc(MiniAppRoutePath, MiniAppHandler)
-	return mux
 }
 
 func (bot *Bot) Start() error {
@@ -290,9 +282,8 @@ func isReportCallback(cb *gotgbot.CallbackQuery) bool {
 }
 
 const (
-	confirmPrefix    = "cf:"
-	deletePrefix     = "rm:"
-	MiniAppRoutePath = "/bot/miniapp"
+	confirmPrefix = "cf:"
+	deletePrefix  = "rm:"
 )
 
 func isConfirmCallback(cb *gotgbot.CallbackQuery) bool {
