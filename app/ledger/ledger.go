@@ -17,8 +17,8 @@ import (
 	_ "embed"
 
 	"github.com/dustin/go-humanize"
+	"github.com/mput/teledger/app/iohelpers"
 	"github.com/mput/teledger/app/repo"
-	"github.com/mput/teledger/app/utils"
 	openai "github.com/sashabaranov/go-openai"
 	"gopkg.in/yaml.v3"
 )
@@ -116,7 +116,7 @@ func (l *Ledger) executeWith(additional string, args ...string) (string, error) 
 	}
 
 	if additional != "" {
-		r = utils.MultiReadCloser(r, io.NopCloser(strings.NewReader(additional)))
+		r = iohelpers.MultiReadCloser(r, io.NopCloser(strings.NewReader(additional)))
 	}
 
 	fargs := []string{"-f", "-"}
