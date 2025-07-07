@@ -36,6 +36,7 @@ go test -v ./...
 - Use `make lint` to do linting
 - Before commit always do a `make format`
 - Do the commit message short. before commit, ask me if I like the commit message.
+- Never commit if not asked for
 
 ### Git Hooks
 - Pre-commit hook automatically runs linting and formatting checks
