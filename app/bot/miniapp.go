@@ -99,7 +99,8 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		Value:    initData,
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 	})
 
 	w.Header().Set("HX-Location", r.Header.Get("HX-Current-URL"))
