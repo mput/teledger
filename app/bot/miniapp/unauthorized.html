@@ -8,10 +8,10 @@
         </div>
         
         <form id="tma-auth"
-              hx-post="/auth"
+              hx-post="/bot/miniapp/auth"
               hx-trigger="load"
               hx-swap="none"
-              hx-vals='js:{initData: Telegram?.WebApp?.initData ?? ""}'>
+              hx-vals='js:{initData: Telegram?.WebApp?.initData}'>
         </form>
     </div>
 {{end}}

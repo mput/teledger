@@ -3,7 +3,9 @@ package bot
 import (
 	_ "embed"
 	"html/template"
+	"log/slog"
 	"net/http"
+	"os"
 )
 
 const (
@@ -42,7 +44,6 @@ func MiniAppHandler(w http.ResponseWriter, _ *http.Request) {
 // UnauthorizedHandler serves the authentication form for unauthorized users
 func UnauthorizedHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusUnauthorized)
 
 	if err := unauthorizedTemplate.Execute(w, nil); err != nil {
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
@@ -60,9 +61,55 @@ func StatisticsHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// AuthMiddleware checks for sid cookie and redirects to unauthorized page if not present
+func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if os.Getenv("DEV_MODE_SKIP_AUTH") != "" {
+			next(w, r)
+			return
+		}
+
+		_, err := r.Cookie("sid")
+		if err != nil {
+			UnauthorizedHandler(w, r)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// AuthHandler sets the sid cookie with Telegram WebApp initData
+func AuthHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+
+	initData := r.PostForm.Get("initData")
+
+	slog.Info("miniapp auth request", "has_init_data", initData != "")
+
+	if initData == "" {
+		http.Error(w, "Missing initData", http.StatusBadRequest)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sid",
+		Value:    initData,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	w.Header().Set("HX-Location", r.Header.Get("HX-Current-URL"))
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (bot *Bot) NewMiniAppMux() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc(MiniAppRoutePath, MiniAppHandler)
-	mux.HandleFunc(MiniAppRoutePath+"/statistics", StatisticsHandler)
+	mux.HandleFunc(MiniAppRoutePath+"/auth", AuthHandler)
+	mux.HandleFunc(MiniAppRoutePath, AuthMiddleware(MiniAppHandler))
+	mux.HandleFunc(MiniAppRoutePath+"/statistics", AuthMiddleware(StatisticsHandler))
 	return mux
 }

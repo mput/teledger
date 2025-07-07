@@ -37,6 +37,14 @@ func main() {
 
 	slog.Info("teledger started", "version", version, "port", opts.Port, "dev_mode", isDevelopmentMode(), "base_url", opts.BaseURL, "github_repo", opts.Github.URL, "github_branch", opts.Github.Branch)
 
+	// Warn about development mode flags
+	if isDevelopmentMode() {
+		slog.Warn("DEV_MODE is enabled - using ngrok for development")
+	}
+	if os.Getenv("DEV_MODE_SKIP_AUTH") != "" {
+		slog.Warn("DEV_MODE_SKIP_AUTH is enabled - authentication is disabled")
+	}
+
 	// Validate BaseURL is provided in production mode
 	if !isDevelopmentMode() && opts.BaseURL == "" {
 		slog.Error("BASE_URL is required in production mode")
