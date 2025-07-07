@@ -6,11 +6,56 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 )
 
 const (
 	MiniAppRoutePath = "/bot/miniapp"
 )
+
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// LoggingMiddleware logs HTTP requests and responses
+func LoggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		// Wrap the response writer to capture status code
+		wrapped := &responseWriter{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK, // default status
+		}
+
+		// Log request
+		slog.Info("http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"remote_addr", r.RemoteAddr,
+			"user_agent", r.UserAgent(),
+		)
+
+		// Call the next handler
+		next(wrapped, r)
+
+		// Log response
+		duration := time.Since(start)
+		slog.Info("http response",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", wrapped.statusCode,
+			"duration_ms", duration.Milliseconds(),
+		)
+	}
+}
 
 //go:embed miniapp/base.html
 var baseTemplateContent string
@@ -113,4 +158,12 @@ func (bot *Bot) NewMiniAppMux() *http.ServeMux {
 	mux.HandleFunc(MiniAppRoutePath, AuthMiddleware(MiniAppHandler))
 	mux.HandleFunc(MiniAppRoutePath+"/statistics", AuthMiddleware(StatisticsHandler))
 	return mux
+}
+
+// NewMiniAppHandler returns the mux wrapped with logging middleware
+func (bot *Bot) NewMiniAppHandler() http.Handler {
+	mux := bot.NewMiniAppMux()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		LoggingMiddleware(mux.ServeHTTP)(w, r)
+	})
 }

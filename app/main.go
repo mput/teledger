@@ -57,14 +57,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	mux := nbot.NewMiniAppMux()
+	httpHandler := nbot.NewMiniAppHandler()
 
 	// Check if we're in development mode and should use ngrok
 	if isDevelopmentMode() {
 		// In development, start ngrok first to get the URL, then start bot
 		ngrokReady := make(chan error, 1)
 		go func() {
-			ngrokReady <- startNgrokServer(opts.Port, nbot, mux, opts.BaseURL)
+			ngrokReady <- startNgrokServer(opts.Port, nbot, httpHandler, opts.BaseURL)
 		}()
 
 		// Wait for ngrok to be ready or fail
@@ -75,7 +75,7 @@ func main() {
 	} else {
 		// In production, start regular server
 		go func() {
-			startRegularServer(opts.Port, mux)
+			startRegularServer(opts.Port, httpHandler)
 		}()
 	}
 
