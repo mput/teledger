@@ -1,8 +1,14 @@
 start:
 	. ./.env.dev && go run app/main.go
 
+start-op:
+	op run --no-masking --env-file="./.env.dev.1password" -- go run app/main.go
+
 test:
 	. ./.env.test && go test -v ./...
+
+test-op:
+	op run --no-masking --env-file="./.env.test.1password" -- go test -v ./...
 
 format:
 	gofumpt -w .
