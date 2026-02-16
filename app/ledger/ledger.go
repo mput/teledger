@@ -452,7 +452,7 @@ func (b OpenAITransactionGenerator) GenerateTransaction(promptCtx PromptCtx) (Tr
 	resp, err := b.openai.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: openai.GPT4oMini,
+			Model: "gpt-5-mini",
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleSystem,
